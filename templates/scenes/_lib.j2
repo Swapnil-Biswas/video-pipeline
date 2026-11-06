@@ -1,0 +1,87 @@
+{#- Shared scene grammar, distilled from the HireCrew showreel compositions.
+    Every template gets: s (scene config), W, H, u (= min(W,H)/1080 scale unit), id, cue(file, t, vol). -#}
+
+{% macro world(kind, id) -%}
+{% if kind == 'dark' -%}
+<div class="world-dark"></div>
+<div class="glow" style="left:{{ (W/2 - 500*u)|round }}px;top:{{ (H/2 - 520*u)|round }}px;width:{{ (1000*u)|round }}px;height:{{ (1000*u)|round }}px"></div>
+{%- else -%}
+<div class="world-light"></div>
+<div class="dotgrid dotgrid--light" data-layout-ignore></div>
+{%- endif %}
+{%- endmacro %}
+
+{#- words("Pay only for [finished work.]") -> spans; [..] becomes the accent pill -#}
+{% macro words(text, light_acc=false) -%}
+{%- for w, acc in split_words(text) -%}
+<span class="w{% if acc %} acc{% if light_acc %} acc--light{% endif %}{% endif %}">{{ w }}</span>
+{%- endfor -%}
+{%- endmacro %}
+
+{#- JS: entry transition on the scene camera; emits its sound cue -#}
+{% macro entry_js(kind, cam, flash_id) -%}
+{%- if kind == 'flash' -%}{% if s.type == 'footage' %}{{ cue('whoosh-hi', s.start, 0.35) }}{% endif %}
+      tl.fromTo("#{{ flash_id }}", { opacity: {{ 0.85 if s.type == 'footage' else 1 }} }, { opacity: 0, duration: {{ 0.22 if s.type == 'footage' else 0.18 }}, ease: "power2.out" }, 0);
+      tl.fromTo("#{{ cam }}", { scale: 1.12 }, { scale: 1.0, duration: {{ [1.2, s.duration - 0.35]|min }}, ease: "expo.out" }, 0);
+{%- elif kind == 'whip-left' -%}{{ cue('whoosh', s.start, 0.55) }}
+      tl.fromTo("#{{ cam }}", { x: {{ (W*0.55)|round }}, filter: "blur(22px)" }, { x: 0, filter: "blur(0px)", duration: 0.3, ease: "expo.out" }, 0);
+{%- elif kind == 'whip-right' -%}{{ cue('whoosh', s.start, 0.55) }}
+      tl.fromTo("#{{ cam }}", { x: {{ (-W*0.55)|round }}, filter: "blur(22px)" }, { x: 0, filter: "blur(0px)", duration: 0.3, ease: "expo.out" }, 0);
+{%- elif kind == 'push-up' -%}{{ cue('whoosh-short', s.start, 0.5) }}
+      tl.fromTo("#{{ cam }}", { y: {{ (H*0.9)|round }}, filter: "blur(22px)" }, { y: 0, filter: "blur(0px)", duration: 0.3, ease: "expo.out" }, 0);
+{%- elif kind == 'punch' -%}{{ cue('whoosh-short', s.start, 0.32) }}
+      tl.fromTo("#{{ cam }}", { scale: 1.16 }, { scale: 1, duration: 0.26, ease: "power3.out" }, 0);
+{%- elif kind == 'zoom-blur' -%}{{ cue('whoosh', s.start + 0.02, 0.42) }}
+      tl.fromTo("#{{ cam }}", { scale: 1.32, filter: "blur(16px)", opacity: 0.4 }, { scale: 1, filter: "blur(0px)", opacity: 1, duration: 0.32, ease: "expo.out" }, 0);
+{%- elif kind == 'shake' -%}{{ cue('impact-bass-1', s.start, 0.35) }}
+      tl.fromTo("#{{ cam }}", { x: 0, y: 0 }, { keyframes: [{ x: -16, y: 9 }, { x: 13, y: -7 }, { x: -7, y: 4 }, { x: 0, y: 0 }], duration: 0.26, ease: "none" }, 0);
+{%- elif kind == 'blur' -%}
+      tl.fromTo("#{{ cam }}", { scale: 1.12, opacity: 0, filter: "blur(16px)" }, { scale: 1, opacity: 1, filter: "blur(0px)", duration: 0.34, ease: "expo.out" }, 0);
+{%- endif -%}
+{%- endmacro %}
+
+{#- JS: exit transition, timed so it ends at the scene end -#}
+{% macro exit_js(kind, cam, flash_id, d) -%}
+{%- if kind == 'whip-left' -%}{{ cue('whoosh', s.start + d - 0.22, 0.55) }}
+      tl.to("#{{ cam }}", { x: {{ (-W*0.9)|round }}, filter: "blur(22px)", duration: 0.24, ease: "power3.in" }, {{ d - 0.24 }});
+{%- elif kind == 'whip-right' -%}{{ cue('whoosh', s.start + d - 0.22, 0.55) }}
+      tl.to("#{{ cam }}", { x: {{ (W*0.9)|round }}, filter: "blur(22px)", duration: 0.24, ease: "power3.in" }, {{ d - 0.24 }});
+{%- elif kind == 'up' -%}{{ cue('whoosh-short', s.start + d - 0.22, 0.5) }}
+      tl.to("#{{ cam }}", { y: {{ (-H*1.1)|round }}, filter: "blur(22px)", duration: 0.24, ease: "power3.in" }, {{ d - 0.24 }});
+{%- elif kind == 'blur' -%}
+      tl.to("#{{ cam }}", { scale: 0.9, opacity: 0, filter: "blur(18px)", duration: 0.2, ease: "power3.in" }, {{ d - 0.2 }});
+{%- elif kind == 'zoom' -%}
+      tl.to("#{{ cam }}", { scale: 1.3, opacity: 0, filter: "blur(18px)", duration: 0.16, ease: "power3.in" }, {{ d - 0.16 }});
+{%- elif kind == 'flash' -%}
+      tl.to("#{{ flash_id }}", { opacity: 1, duration: 0.12, ease: "power2.in" }, {{ d - 0.12 }});
+{%- endif -%}
+{%- endmacro %}
+
+{#- cursor arrow (inline svg, same shape as the original) -#}
+{% macro cursor(cid) -%}
+<svg id="{{ cid }}" class="cursor rf-cursor" viewBox="0 0 32 38"><path d="M3 2 L3 31 L10.5 24 L15.5 35 L20.5 32.8 L15.6 22 L26 22 Z" fill="#fff" stroke="{{ T.on_light }}" stroke-width="2.4" stroke-linejoin="round"/></svg>
+{%- endmacro %}
+
+{% macro glyph(name) -%}
+{%- set g = {
+  'mail': '<rect x="8" y="14" width="48" height="36" rx="7"/><path d="M11 19 L32 34 L53 19"/>',
+  'grid': '<rect x="10" y="10" width="44" height="44" rx="7"/><path d="M10 25H54M10 39H54M27 10V54"/>',
+  'doc': '<path d="M18 8h20l10 10v38H18z"/><path d="M38 8v10h10M24 32h18M24 40h18M24 48h11"/>',
+  'chat': '<path d="M10 14h44v29H30l-11 10V43H10z"/>',
+  'bolt': '<path d="M36 6 L15 36 H30 L27 58 L49 27 H34 Z"/>',
+  'check': '<path d="M16 33 L27 44 L49 21"/>',
+  'star': '<path d="M32 8l7 15 16 2-12 11 3 16-14-8-14 8 3-16-12-11 16-2z"/>',
+  'play': '<path d="M22 14v36l28-18z"/>',
+  'code': '<path d="M24 20L12 32l12 12M40 20l12 12-12 12"/>',
+  'coin': '<circle cx="32" cy="32" r="22"/><path d="M32 20v24M26 26h9a4 4 0 010 8h-6a4 4 0 000 8h9"/>',
+  'phone': '<rect x="19" y="7" width="26" height="50" rx="6"/><path d="M29 49h6"/>',
+  'camera': '<path d="M8 22h12l4-6h16l4 6h12v28H8z"/><circle cx="32" cy="35" r="9"/>',
+  'mic': '<rect x="24" y="8" width="16" height="28" rx="8"/><path d="M16 30a16 16 0 0032 0M32 46v10M24 56h16"/>',
+  'bulb': '<path d="M24 44c0-6-8-10-8-20a16 16 0 0132 0c0 10-8 14-8 20z"/><path d="M25 51h14M28 57h8"/>',
+  'users': '<circle cx="24" cy="24" r="8"/><path d="M10 50c0-8 6-13 14-13s14 5 14 13"/><circle cx="44" cy="22" r="6"/><path d="M42 36c8 0 13 5 13 12"/>',
+  'target': '<circle cx="32" cy="32" r="22"/><circle cx="32" cy="32" r="13"/><circle cx="32" cy="32" r="4"/>',
+  'steps': '<path d="M8 52h14V40h12V28h12V16h10"/>',
+  'chart': '<path d="M10 52h44M14 44l12-12 9 8 17-18"/><path d="M44 22h8v8"/>',
+  'clock': '<circle cx="32" cy="32" r="22"/><path d="M32 18v15l10 6"/>'} -%}
+<svg viewBox="0 0 64 64">{{ g.get(name, g['check'])|safe }}</svg>
+{%- endmacro %}

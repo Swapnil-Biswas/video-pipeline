@@ -1,0 +1,40 @@
+# Raw talking-head video -> edited 9:16 reel, made only with reelforge (auto-edit from the transcript).
+name: creator-talk
+canvas: {width: 1080, height: 1920, fps: 30, motion_blur: true}
+
+references:
+  - src: "C:/Users/swapn/Downloads/Raw talking video for the people who was to become content creators! Yeh demotivate karnay ky li.mp4"
+footage:
+  - id: talk
+    src: "C:/Users/swapn/Downloads/Raw talking video for the people who was to become content creators! Yeh demotivate karnay ky li.mp4"
+
+aroll: {video: talk}
+
+transcribe:
+  enabled: true
+  fixes:      # caption proofreading (the translation is literal in a few places)
+    - ["^people used to miss\\. That you go viral on the phone", "You can go viral with just a phone,"]
+    - ["The difference between land and sky\\.", "That's a world of difference."]
+    - ["It can only be good like this\\.", "Only one way."]
+    - ["^With money\\. It should have", "Money. You need"]
+    - ["Ted Talk", "TED talk"]
+
+scenes: auto
+
+autoedit:
+  list_heading: "What you [need]"
+  outro: {type: kinetic, duration: 2.6, world: dark, entry: whip-left, lines: [{text: "Still want to", size: 110}, {text: "[start?]", size: 150}]}
+
+captions: {enabled: true, style: reel}
+
+music:
+  mode: take
+  takes_dir: ../showreel/assets/music    # scorer picks the steadiest original MusicGen take; looped to length
+  arrange: {bpm: 124, drop: 0, intro_lowpass: false, fade_out: 2.5}
+  volume: 0.5
+  volume_under_voice: 0.11
+  duck: {at_clicks: false, under_speech: true}
+
+voice: {mode: none}
+
+render: {resolution: portrait, quality: delivery, gpu: true}

@@ -1,0 +1,21 @@
+# Raw talking video edited in the style of the *edited* video in https://www.instagram.com/p/DdgtvkmgrXd/
+# The post is ONE video: 0-8.6 s is a split screen, the AI-edited cut on the left ("AI"), the original on the right.
+# Only the edited panel is used: trimmed to the split-screen part and cropped to the left panel.
+name: creator-insta
+canvas: {width: 1080, height: 1920, fps: 30, motion_blur: true}
+references:
+  - {url: "https://www.instagram.com/p/DdgtvkmgrXd/", trim: [0.0, 8.6], crop: [0.10, 0.295, 0.385, 0.39]}
+footage: [{id: talk, src: "C:/Users/swapn/Downloads/Raw talking video for the people who was to become content creators! Yeh demotivate karnay ky li.mp4"}]
+aroll: {video: talk}
+style: {from_reference: true}
+transcribe:
+  enabled: true
+  fixes:
+    - ['^people used to miss\. That you go viral on the phone', 'You can go viral with just a phone,']
+    - ['The difference between land and sky\.', "That's a world of difference."]
+    - ['It can only be good like this\.', 'Only one way.']
+    - ['^With money\. It should have', 'Money. You need']
+scenes: auto
+captions: {enabled: true}
+music: {mode: take, takes_dir: ../../assets/music/library, arrange: {drop: 0, intro_lowpass: false}, volume: 0.5, volume_under_voice: 0.11}
+render: {resolution: portrait, quality: delivery, gpu: true}

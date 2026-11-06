@@ -1,0 +1,46 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; overflow: hidden; }
+    #gt-cam { position: absolute; inset: 0; }
+    #gt-l { top: 150px; font-size: 92px; color: #f2f2f3; }
+    #gt-list { position: absolute; left: 560px; top: 360px; width: 800px; display: grid; gap: 22px; }
+    .gt-row { display: flex; align-items: center; gap: 22px; padding: 24px 30px; border-radius: 30px; background: #232326; font-size: 40px; font-weight: 600; color: #ececee;
+      box-shadow: 0 24px 40px -24px rgba(0,0,0,.9), inset 4px 4px 10px rgba(255,255,255,.06), inset -6px -6px 12px rgba(0,0,0,.5); }
+    .gt-row b { font-weight: 700; }
+    .gt-row span.s { margin-left: auto; font-size: 30px; color: #9a9a9e; }
+    .gt-x { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; box-shadow: inset 0 0 0 3px #f2f2f2; position: relative; flex: none; }
+    .gt-x::before, .gt-x::after { content: ""; position: absolute; width: 3px; height: 20px; background: #f2f2f2; border-radius: 2px; transform: rotate(45deg); }
+    .gt-x::after { transform: rotate(-45deg); }
+    #gt-r3 b { text-decoration: line-through; text-decoration-thickness: 3px; color: #9a9a9e; }
+    #gt-stamp { position: absolute; left: 1010px; top: 584px; padding: 14px 34px; border-radius: 22px; font-size: 76px; font-weight: 700; letter-spacing: 0.04em; color: #151515;
+      background: #f4f4f4; box-shadow: 0 30px 50px -20px rgba(0,0,0,.8); }
+  </style>
+  <div id="root" data-composition-id="gate" data-width="1920" data-height="1080" data-layout-allow-overlap>
+    <div class="world-dark"></div>
+    <div class="glow" style="left:560px;top:160px;width:820px;height:820px"></div>
+    <div id="gt-cam" data-layout-allow-overflow>
+      <p id="gt-l" class="kt"><span class="w">Every</span><span class="w">step</span><span class="w acc acc--light">checked.</span></p>
+      <div id="gt-list">
+        <div class="gt-row" id="gt-r1"><span class="tick tick--light"></span><b>gmail.search</b><span class="s">allowed</span></div>
+        <div class="gt-row" id="gt-r2"><span class="tick tick--light"></span><b>sheets.append</b><span class="s">allowed</span></div>
+        <div class="gt-row" id="gt-r3"><span class="gt-x"></span><b>gmail.send</b><span class="s">not in allowlist</span></div>
+      </div>
+      <div id="gt-stamp">BLOCKED</div>
+    </div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo("#gt-cam", { x: 1000, filter: "blur(22px)" }, { x: 0, filter: "blur(0px)", duration: 0.3, ease: "expo.out" }, 0);
+      tl.fromTo("#gt-l .w", { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.12, stagger: 0.07, ease: "power2.out" }, 0.12);
+      tl.fromTo(".gt-row", { opacity: 0, x: -50 }, { opacity: 1, x: 0, duration: 0.24, stagger: 0.16, ease: "expo.out" }, 0.25);
+      // The out-of-scope call gets stamped.
+      tl.fromTo("#gt-stamp", { opacity: 0, scale: 2.6, rotation: -16 }, { opacity: 1, scale: 1, rotation: -8, duration: 0.18, ease: "power4.in" }, 0.72);
+      tl.fromTo("#gt-cam", { x: 0, y: 0 }, { keyframes: [{ x: -14, y: 8 }, { x: 12, y: -6 }, { x: -6, y: 4 }, { x: 0, y: 0 }], duration: 0.24, ease: "none", immediateRender: false }, 0.9);
+      tl.to("#gt-r3 .s", { opacity: 0, duration: 0.08 }, 0.84);
+      tl.fromTo("#gt-list", { scale: 1 }, { scale: 1.04, duration: 1.2, ease: "none" }, 0);
+      tl.to("#gt-cam", { scale: 0.9, opacity: 0, filter: "blur(18px)", duration: 0.2, ease: "power3.in" }, 1.2);
+      window.__timelines["gate"] = tl;
+    })();
+  </script>
+</template>

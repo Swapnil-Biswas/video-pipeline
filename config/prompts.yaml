@@ -1,0 +1,38 @@
+# Prompt library used by the pipeline. Original prompts are verbatim from the HireCrew session.
+# Derived prompts (marked) are new and are meant for a human or an AI assistant at the review checkpoints.
+
+musicgen:
+  showreel:            # original (batch_reel2.py) -> final showreel used seed 404 with prompt [1]
+    - "upbeat modern motion graphics showreel music, bright plucky synths, punchy claps and snaps, crisp hi-hats, tight kick, energetic and playful, clean commercial mix, 124 bpm, instrumental"
+    - "energetic tech promo track for a fast-cut motion design reel, glossy synth chords, bouncy bass, sharp percussion, confident and fun, polished modern production, 124 bpm, instrumental"
+  launch_film:         # original (gen.py / batch.py, film 1)
+    - "energetic modern tech product launch music, driving four-on-the-floor electronic beat, punchy kick drum, tight claps, deep sub bass, bright plucky synth arpeggios, clean and confident, uplifting, polished commercial production, 120 bpm, instrumental"
+    - "modern minimal tech house for a sleek software product launch, punchy kick on every beat, crisp hi-hats, rolling sub bass, glassy synth stabs and bright pluck melody, confident and optimistic, clean high-end mix, 120 bpm, instrumental"
+
+briefs:                # original user briefs (verbatim) — templates for new projects
+  style_transfer_reel: |
+    Take this video : {reference_url}. And the code, it's editing style: cuts, motion graphics, sound effects transitions and also music
+    now use what you learned to edit my video in the same style as this with the same energy
+    keep my content original and make the sound editing feel original and almost the same as the video. It should be equally engaging to make it professional. u can change the script if u want .. but the whole thign should revolve around {product} ..... take as much time as u need and use any resource u want including my gpu to render but make it studio grade.
+  polish_pass: |
+    There are multiple glitches in the video style. Try to fix them out. Take your time, render properly. Use the GPU and do it. It should be studio grade, and no glitches should exist in the video. Also, try to closely copy the editing style of the video. The Instagram reel is sent you earlier. Make sure to render the entire thing properly. Do not be in a hurry while doing this. Making certain glitches while making the video: either the font is out of place, or it's not properly aligned, or something. Please be careful with that respect .  it should be production level. Now make the video using the setup. You might recollect the older chats if you want to check what tools you used.
+
+review:                # derived (new) — used at checkpoints
+  style_notes: |
+    You are given contact sheets of a reference video (timestamps in reading order) and analysis.json
+    (duration, fps, cut times, tempo, onsets, band energy). Describe its editing grammar so it can be
+    re-created with different content: shot/scene types and their order, average scene length, camera
+    moves (close-up tracking, pull-outs, punch-ins, zoom-throughs), transitions, kinetic type behaviour,
+    colour worlds, cursor/UI interactions, the music arc (intro level, drop time) and how sound hits
+    line up with picture. Output a bullet list and a proposed scene list with durations.
+  storyboard: |
+    Using the style notes and this product brief: {brief}
+    write a reelforge project.yaml `scenes:` list. Use scene types chat, kinetic, card, endcard, footage
+    (or file for custom HTML). Keep the reference's pacing (cut every ~1.5 s after the hook, drop at
+    {drop}s), one idea per scene, accent one word per headline, end with the brand name reveal and a CTA.
+  qa_review: |
+    Review these preview contact sheets and seam strips frame by frame. List every glitch with its
+    timestamp: text clipped by the frame or by another element, misaligned or off-centre elements,
+    overlapping elements, a wrong/fallback font, a caret or cursor in the wrong place, an empty or
+    flash frame longer than one frame after a cut, an element popping in without animation, hard edges
+    on blurred shapes. Say "no glitches" only if there are none.

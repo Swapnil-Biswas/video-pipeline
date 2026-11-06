@@ -1,0 +1,18 @@
+# reelforge runtime. Install order matters (see README "Install"):
+#   1) CUDA PyTorch from the PyTorch index, 2) this file with the constraints file:
+#   pip install torch==2.11.0 torchvision==0.26.0 torchaudio==2.11.0 --index-url https://download.pytorch.org/whl/cu128
+#   pip install -r requirements.txt -c constraints.txt
+pyyaml>=6
+jinja2>=3.1
+numpy>=1.26
+librosa>=0.10
+soundfile>=0.12
+scikit-learn>=1.4
+opencv-python-headless>=4.10
+easyocr>=1.7          # reference on-screen text (caption style, fonts)
+transformers>=4.45    # Whisper (transcribe), MusicGen (music.mode=generate)
+yt-dlp>=2025.1.1      # only for references given as URLs (disabled in the API)
+fastapi>=0.110        # HTTP API
+uvicorn>=0.29
+python-multipart>=0.0.9
+httpx>=0.27           # tests

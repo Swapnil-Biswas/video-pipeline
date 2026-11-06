@@ -1,0 +1,115 @@
+# The original HireCrew showreel (video-showreel/), reproduced by reelforge.
+# Scenes are the hand-authored compositions (type: file); music is the MusicGen take used in the final;
+# the 79 sound cues and 3 click ducks are copied from video-showreel/tools/audio.py.
+name: showreel
+
+canvas: {width: 1920, height: 1080, fps: 60, motion_blur: true}
+
+references:
+  - src: refs/ref.mp4          # https://www.instagram.com/reel/Dd7LoTKSsbT/ (Aiden | Motion Designer), analysis only
+
+scenes:
+  - {id: chat, type: file, src: scenes/chat.html, duration: 9.0}
+  - {id: title, type: file, src: scenes/title.html, duration: 1.6}
+  - {id: order, type: file, src: scenes/order.html, duration: 1.8}
+  - {id: held, type: file, src: scenes/held.html, duration: 1.4}
+  - {id: gate, type: file, src: scenes/gate.html, duration: 1.4}
+  - {id: sheet, type: file, src: scenes/sheet.html, duration: 1.6}
+  - {id: choice, type: file, src: scenes/choice.html, duration: 1.6}
+  - {id: paid, type: file, src: scenes/paid.html, duration: 2.0}
+  - {id: crew, type: file, src: scenes/crew.html, duration: 2.0}
+  - {id: end, type: file, src: scenes/end.html, duration: 5.6}
+
+music:
+  mode: take
+  take: assets/music/clip_musicgen-stereo-medium_404_p1.wav   # original choice (score.py rejected 303 for a dropout)
+  # takes_dir: assets/music      # or: let the scorer pick among all six original takes
+  arrange: {bpm: 124, drop: 9.0, intro_lowpass: true}
+  volume: 0.85
+  duck_at: [11.9, 17.94, 25.72]
+
+sfx:
+  auto: false
+  cues:   # [file, picture time (s), volume]
+    - [pop-hi, 0.05, 0.5]
+    - [key-press, 0.95, 0.4]
+    - [key-press, 1.15, 0.35]
+    - [pop-lo, 1.5, 0.6]
+    - [pop-hi, 2.25, 0.55]
+    - [key-press, 2.85, 0.4]
+    - [key-press, 3.05, 0.35]
+    - [pop-lo, 3.35, 0.6]
+    - [pop-hi, 3.95, 0.55]
+    - [whoosh, 4.6, 0.55]
+    - [ping, 4.7, 0.45]
+    - [pop-lo, 5.05, 0.6]
+    - [pop, 5.65, 0.6]
+    - [click-soft, 5.82, 0.4]
+    - [click-soft, 5.91, 0.4]
+    - [click-soft, 6.0, 0.4]
+    - [pop-hi, 6.25, 0.6]
+    - [pop-lo, 6.55, 0.6]
+    - [key-press, 7.1, 0.4]
+    - [key-press, 7.3, 0.35]
+    - [impact-bass-1, 7.66, 0.55]
+    - [pop-hi, 7.64, 0.7]
+    - [whoosh-cinematic, 8.95, 0.6]
+    - [impact-bass-1, 9.0, 0.8]
+    - [click-soft, 9.3, 0.4]
+    - [click-soft, 9.4, 0.4]
+    - [pop, 9.5, 0.7]
+    - [whoosh-short, 10.62, 0.6]
+    - [typing, 10.9, 0.35]
+    - [pop-hi, 11.45, 0.6]
+    - [pop, 11.55, 0.55]
+    - [click, 11.9, 1.0]
+    - [key-press, 11.9, 0.8]
+    - [pop-lo, 11.92, 0.75]
+    - [whoosh, 12.3, 0.6]
+    - [pop-lo, 12.95, 0.7]
+    - [pop-hi, 13.2, 0.65]
+    - [whoosh-hi, 13.5, 0.6]
+    - [whoosh-short, 13.85, 0.5]
+    - [click-soft, 14.1, 0.55]
+    - [click-soft, 14.26, 0.55]
+    - [click-soft, 14.42, 0.55]
+    - [stamp, 14.72, 0.6]
+    - [whoosh-lo, 15.15, 0.55]
+    - [key-press, 15.62, 0.55]
+    - [key-press, 15.76, 0.5]
+    - [key-press, 15.9, 0.55]
+    - [pop-hi, 16.2, 0.65]
+    - [whoosh, 16.7, 0.55]
+    - [whoosh-hi, 16.85, 0.45]
+    - [click-soft, 17.42, 0.45]
+    - [click, 17.94, 1.0]
+    - [key-press, 17.94, 0.8]
+    - [pop-lo, 17.96, 0.7]
+    - [pop-lo, 18.08, 0.65]
+    - [whoosh-hi, 18.32, 0.6]
+    - [impact-bass-1, 18.48, 0.6]
+    - [click-lo, 18.55, 0.45]
+    - [click-lo, 18.62, 0.45]
+    - [click-lo, 18.69, 0.45]
+    - [pop, 18.75, 0.6]
+    - [ping, 19.75, 0.55]
+    - [pop, 19.82, 0.55]
+    - [whoosh, 20.25, 0.55]
+    - [whoosh, 20.45, 0.5]
+    - [pop-hi, 20.87, 0.65]
+    - [pop, 21.09, 0.65]
+    - [pop-lo, 21.31, 0.65]
+    - [glitch-3, 21.55, 0.4]
+    - [whoosh-lo, 22.25, 0.55]
+    - [key-press, 22.62, 0.5]
+    - [key-press, 22.8, 0.45]
+    - [key-press, 22.95, 0.5]
+    - [impact-bass-2, 23.2, 0.7]
+    - [pop, 24.25, 0.6]
+    - [pop-hi, 24.75, 0.6]
+    - [click, 25.72, 1.0]
+    - [key-press, 25.72, 0.8]
+    - [pop-lo, 25.74, 0.8]
+
+render: {resolution: landscape-4k, quality: delivery, gpu: true}
+master: {lufs: -14, true_peak: -1.5, lra: 11, limiter: 0.84, aac_bitrate: 320k}

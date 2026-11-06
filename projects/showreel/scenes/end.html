@@ -1,0 +1,51 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; overflow: hidden; }
+    #en-cam { position: absolute; inset: 0; transform-origin: 50% 45%; }
+    #en-row { position: absolute; left: 0; right: 0; top: 300px; display: flex; justify-content: center; align-items: center; gap: 40px; }
+    #en-this { display: inline-block; width: 352px; text-align: left; font-size: 120px; font-weight: 700; letter-spacing: -0.045em; color: #151515; white-space: nowrap; }
+    #en-caret { display: inline-block; width: 8px; height: 110px; margin-left: 8px; background: #151515; vertical-align: -14px; }
+    #en-tile { width: 300px; height: 300px; border-radius: 64px; background: #000; overflow: hidden; display: grid; place-items: center; }
+    #en-tile img { width: 226px; height: auto; display: block; }
+    #en-l { top: 690px; font-size: 64px; color: #151515; }
+    #en-btn { position: absolute; left: 0; right: 0; top: 820px; display: flex; justify-content: center; }
+    #en-btn .btn { height: 100px; padding: 0 56px; font-size: 38px; }
+  </style>
+  <div id="root" data-composition-id="end" data-width="1920" data-height="1080" data-layout-allow-overlap>
+    <div class="world-light"></div>
+    <div class="dotgrid dotgrid--light"></div>
+    <div id="en-cam" data-layout-allow-overflow>
+      <div id="en-row">
+        <span id="en-this"><span id="en-txt"></span><span id="en-caret"></span></span>
+        <div id="en-tile" class="clay"><img src="assets/brand/hirecrew-logo-trim.png" alt="HireCrew" /></div>
+      </div>
+      <p id="en-l" class="kt"><span class="w">Pay</span><span class="w">only</span><span class="w">for</span><span class="w acc">finished work.</span></p>
+      <div id="en-btn"><span id="en-b" class="btn btn--dark">Join HireCrew <span>→</span></span></div>
+    </div>
+    <div id="en-black" style="position:absolute;inset:0;background:#000;opacity:0;z-index:60"></div>
+    <svg id="en-cursor" class="cursor" viewBox="0 0 32 38" style="left:0;top:0"><path d="M3 2 L3 31 L10.5 24 L15.5 35 L20.5 32.8 L15.6 22 L26 22 Z" fill="#fff" stroke="#151515" stroke-width="2.4" stroke-linejoin="round"/></svg>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo("#en-cam", { opacity: 0 }, { opacity: 1, duration: 0.2 }, 0);
+      // The name reveal: "This is" types, then the mark lands beside it.
+      const ty = { n: 0 }, full = "This is";
+      const typ = () => { document.getElementById("en-txt").textContent = full.slice(0, Math.round(ty.n)); };
+      tl.fromTo(ty, { n: 0 }, { n: full.length, duration: 0.45, ease: "none", onUpdate: typ, onStart: typ, onComplete: typ, immediateRender: true }, 0.15);
+      tl.fromTo("#en-caret", { opacity: 1 }, { keyframes: [{ opacity: 0 }, { opacity: 1 }, { opacity: 0 }, { opacity: 1 }, { opacity: 0 }], duration: 1.6, ease: "steps(5)" }, 0.6);
+      tl.fromTo("#en-tile", { opacity: 0, scale: 0.2, rotation: -20 }, { opacity: 1, scale: 1, rotation: 0, duration: 0.5, ease: "back.out(1.8)" }, 0.75);
+      tl.fromTo("#en-tile img", { scale: 1.4, filter: "blur(16px)" }, { scale: 1, filter: "blur(0px)", duration: 0.45, ease: "expo.out" }, 0.85);
+      tl.fromTo("#en-l .w", { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.16, stagger: 0.1, ease: "power2.out" }, 1.5);
+      tl.fromTo("#en-l .acc", { scale: 0.6 }, { scale: 1, duration: 0.35, ease: "back.out(2.4)" }, 1.8);
+      tl.fromTo("#en-b", { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.4, ease: "back.out(1.8)" }, 2.3);
+      tl.fromTo("#en-cursor", { x: 1960, y: 1120 }, { x: 990, y: 880, duration: 0.5, ease: "power3.out" }, 2.7);
+      tl.to("#en-cursor", { scale: 0.85, duration: 0.07, yoyo: true, repeat: 1 }, 3.3);
+      tl.to("#en-b", { scale: 0.93, duration: 0.07, yoyo: true, repeat: 1 }, 3.3);
+      tl.to("#en-cursor", { opacity: 0, duration: 0.3 }, 3.8);
+      tl.fromTo("#en-cam", { scale: 1 }, { scale: 1.05, duration: 5.4, ease: "none", immediateRender: false }, 0.2);
+      tl.fromTo("#en-black", { opacity: 0 }, { opacity: 1, duration: 0.6, ease: "power2.in" }, 4.95);
+      window.__timelines["end"] = tl;
+    })();
+  </script>
+</template>

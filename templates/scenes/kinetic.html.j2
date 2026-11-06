@@ -1,0 +1,58 @@
+{% import "_lib.j2" as lib with context %}
+{#- Kinetic headline (original: title / held / gate / sheet headlines).
+    s.lines: [{text: "Pay only for [finished work.]", size: 176, weight: 700, tone: ink|muted}]
+    s.tiles: [mail, grid, doc, chat, bolt, check]  floating clay icon tiles at depth
+    s.world: light|dark   s.entry / s.exit: flash|whip-left|whip-right|push-up|blur|none / whip-left|whip-right|up|blur|zoom|flash|none -#}
+{%- set dark = s.world == 'dark' -%}
+{%- set d = s.duration -%}
+<template>
+  <style>
+    #{{ id }}-root { position: absolute; inset: 0; overflow: hidden; }
+    #{{ id }}-cam { position: absolute; inset: 0; transform-origin: 50% 50%; }
+    #{{ id }}-push { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: {{ (14*u)|round }}px; }
+    #{{ id }}-root .kl { position: relative; font-family: {{ T.font_display }};{% if T.display_upper %} text-transform: uppercase;{% endif %}  max-width: {{ (W*0.9)|round }}px; text-align: center; font-weight: 700; letter-spacing: -0.04em; line-height: 1.04; color: {{ T.on_dark if dark else T.on_light }}; }
+    #{{ id }}-root .kl.muted { color: {{ T.on_dark_2 if dark else T.on_light_2 }}; font-weight: 600; letter-spacing: -0.02em; }
+    #{{ id }}-root .kl .w { display: inline-block; margin-right: 0.2em; }
+    #{{ id }}-root .kl .w:last-child { margin-right: 0; }
+    #{{ id }}-root .tile { position: absolute; display: grid; place-items: center; border-radius: 30%; }
+    #{{ id }}-root .tile svg { width: 52%; height: 52%; fill: none; stroke: currentColor; stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; }
+    #{{ id }}-root .tile.lt { background: {{ T.paper }}; color: {{ T.on_light }}; }
+    #{{ id }}-flash { position: absolute; inset: 0; background: {{ T.paper }}; opacity: 0; pointer-events: none; }
+  </style>
+  <div id="{{ id }}-root" data-composition-id="{{ id }}" data-width="{{ W }}" data-height="{{ H }}" data-layout-allow-overlap>
+    {{ lib.world(s.world or 'light', id) }}
+    {%- set slots = [(0.16,0.16,150,0,-10),(0.84,0.19,150,0,9),(0.12,0.78,124,2,7),(0.86,0.8,124,2,-8),(0.66,0.08,86,4,12),(0.31,0.9,86,4,-12)] %}
+    {%- for g in (s.tiles or []) %}{% set sl = slots[loop.index0 % 6] %}
+    <div class="tile clay {{ 'clay--dark' if loop.index0 % 2 else 'lt' }}" id="{{ id }}-t{{ loop.index0 }}" data-layout-ignore
+      style="left:{{ (W*sl[0] - sl[2]*u/2)|round }}px;top:{{ (H*sl[1] - sl[2]*u/2)|round }}px;width:{{ (sl[2]*u)|round }}px;height:{{ (sl[2]*u)|round }}px">{{ lib.glyph(g) }}</div>
+    {%- endfor %}
+    <div id="{{ id }}-cam" data-layout-allow-overflow><div id="{{ id }}-push">
+      {%- for l in s.lines %}
+      <p class="kl{% if l.tone == 'muted' %} muted{% endif %}" id="{{ id }}-l{{ loop.index0 }}" style="font-size:{{ ((l.size or 120)*u)|round }}px{% if l.weight %};font-weight:{{ l.weight }}{% endif %}">{{ lib.words(l.text, dark) }}</p>
+      {%- endfor %}
+    </div></div>
+    <div id="{{ id }}-flash"></div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+{{ lib.entry_js(s.entry or 'blur', id ~ '-cam', id ~ '-flash') }}
+      {%- set t0 = 0.08 %}
+      {%- for l in s.lines %}{% set big = (l.size or 120) >= 140 %}
+      {%- if has_plain(l.text) %}
+      tl.fromTo("#{{ id }}-l{{ loop.index0 }} .w:not(.acc)", { opacity: 0, y: {{ (50*u)|round if big else 0 }}, filter: "blur({{ 14 if big else 10 }}px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: {{ 0.24 if big else 0.14 }}, stagger: 0.06, ease: "{{ 'power4.out' if big else 'power2.out' }}" }, {{ t0 + loop.index0 * 0.15 }});
+      {%- endif %}{% if '[' in l.text %}
+      tl.fromTo("#{{ id }}-l{{ loop.index0 }} .acc", { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.32, ease: "back.out(2.2)" }, {{ t0 + loop.index0 * 0.15 + 0.2 }});
+      {%- endif %}{%- if '[' in l.text %}{{ cue('pop', s.start + t0 + loop.index0 * 0.15 + 0.26, 0.6) }}{% endif %}
+      {%- endfor %}
+      {%- for g in (s.tiles or []) %}{% set sl = slots[loop.index0 % 6] %}{% set dx = (-1 if sl[0] < 0.5 else 1) * 40 %}{% set dy = (-1 if sl[1] < 0.5 else 1) * 28 %}
+      tl.fromTo("#{{ id }}-t{{ loop.index0 }}", { opacity: 0, scale: 0.4, x: {{ dx*3 }}, y: {{ dy*3 }}, rotation: {{ sl[4]*2 }}, filter: "blur({{ sl[3] + 12 }}px)" }, { opacity: 1, scale: 1, x: 0, y: 0, rotation: {{ sl[4] }}, filter: "blur({{ sl[3] }}px)", duration: 0.55, ease: "expo.out" }, {{ 0.22 + loop.index0 * 0.05 }});
+      {%- set te = 0.22 + loop.index0 * 0.05 + 0.55 %}
+      tl.to("#{{ id }}-t{{ loop.index0 }}", { x: {{ dx }}, y: {{ dy }}, rotation: {{ sl[4] * 0.6 }}, duration: {{ [d - te - 0.2, 0.3]|max }}, ease: "none" }, {{ te }});
+      {%- endfor %}
+      tl.fromTo("#{{ id }}-push", { scale: 1 }, { scale: 1.04, duration: {{ d - 0.4 }}, ease: "none", immediateRender: false }, 0.4);
+{{ lib.exit_js(s.exit or 'blur', id ~ '-cam', id ~ '-flash', d) }}
+      window.__timelines["{{ id }}"] = tl;
+    })();
+  </script>
+</template>

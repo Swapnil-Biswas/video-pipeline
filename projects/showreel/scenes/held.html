@@ -1,0 +1,45 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; overflow: hidden; }
+    #hd-cam { position: absolute; inset: 0; }
+    #hd-l { top: 170px; font-size: 96px; color: #151515; }
+    #hd-card { position: absolute; left: 560px; top: 380px; width: 800px; height: 420px; border-radius: 44px; padding: 40px 46px; }
+    #hd-card .meta { font-size: 30px; font-weight: 600; color: #c4c4c6; }
+    #hd-card .amt { font-size: 140px; font-weight: 700; letter-spacing: -0.05em; line-height: 1; margin-top: 14px; }
+    #hd-well { position: absolute; left: 40px; right: 40px; bottom: 36px; height: 110px; border-radius: 30px; background: #2a2a2d; display: flex; align-items: center; gap: 20px; padding: 0 24px;
+      box-shadow: inset 6px 6px 12px rgba(0,0,0,.6), inset -3px -3px 8px rgba(255,255,255,.08); }
+    #hd-coin { width: 74px; height: 74px; border-radius: 50%; display: grid; place-items: center; font-size: 28px; font-weight: 700; color: #151515; flex: none;
+      background: radial-gradient(circle at 32% 28%, #fff 0%, #e9e9e9 40%, #b9b9bb 85%); box-shadow: 0 12px 18px -8px rgba(0,0,0,.8); }
+    #hd-well .lbl { font-size: 30px; font-weight: 600; color: #c4c4c6; }
+    #hd-lock { margin-left: auto; font-size: 30px; }
+    #hd-white { position: absolute; inset: 0; background: #f4f4f4; }
+  </style>
+  <div id="root" data-composition-id="held" data-width="1920" data-height="1080" data-layout-allow-overlap>
+    <div class="world-light"></div>
+    <div class="dotgrid dotgrid--light"></div>
+    <div id="hd-cam">
+      <p id="hd-l" class="kt"><span class="w">Your</span><span class="w">money</span><span class="w acc">waits.</span></p>
+      <div id="hd-card" class="clay clay--dark">
+        <div class="meta">Checkout · Dodo Payments</div>
+        <div class="amt">$5.00</div>
+        <div id="hd-well"><span id="hd-coin">$5</span><span class="lbl">Held until you accept</span><span id="hd-lock" class="state state--held">Held</span></div>
+      </div>
+    </div>
+    <div id="hd-white"></div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo("#hd-white", { opacity: 1 }, { opacity: 0, duration: 0.14, ease: "power2.out" }, 0);
+      tl.fromTo("#hd-card", { scale: 0.7, y: 120, filter: "blur(14px)" }, { scale: 1, y: 0, filter: "blur(0px)", duration: 0.4, ease: "expo.out" }, 0.02);
+      tl.fromTo("#hd-l .w", { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.12, stagger: 0.07, ease: "power2.out" }, 0.1);
+      tl.fromTo("#hd-l .acc", { scale: 0.6 }, { scale: 1, duration: 0.3, ease: "back.out(2.4)" }, 0.24);
+      tl.fromTo("#hd-coin", { y: -320, opacity: 0 }, { y: 0, opacity: 1, duration: 0.42, ease: "bounce.out" }, 0.4);
+      tl.fromTo("#hd-lock", { scale: 0.3, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.28, ease: "back.out(2.4)" }, 0.78);
+      tl.fromTo("#hd-cam", { scale: 1 }, { scale: 1.04, duration: 1.4, ease: "none" }, 0);
+      // Whip left into the next world.
+      tl.to("#hd-cam", { x: -1700, filter: "blur(22px)", duration: 0.24, ease: "power3.in" }, 1.16);
+      window.__timelines["held"] = tl;
+    })();
+  </script>
+</template>

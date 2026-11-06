@@ -1,0 +1,149 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; overflow: hidden; }
+    /* camera: transform-origin 0 0, so x/y/scale put any cam-space point at screen centre */
+    #ch-cam { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; }
+    #ch-grid { position: absolute; left: -1400px; top: -1200px; width: 4720px; height: 5000px;
+      background-image: radial-gradient(rgba(255,255,255,.075) 2px, transparent 2.5px); background-size: 46px 46px; }
+    .ch-col { position: absolute; left: 430px; width: 1060px; }
+    #col-old { top: 300px; }
+    #col-new { top: 1500px; }
+    .bub { position: absolute; padding: 22px 32px 24px; border-radius: 34px; font-size: 40px; font-weight: 600; letter-spacing: -0.005em; word-spacing: 0.04em; line-height: 1.2; white-space: nowrap; }
+    .bub .time { display: inline-block; margin-left: 18px; font-size: 22px; font-weight: 600; opacity: .55; vertical-align: middle; }
+    .bub.in { left: 0; background: #232326; color: #f2f2f3; border-bottom-left-radius: 10px;
+      box-shadow: 0 24px 40px -22px rgba(0,0,0,.8), inset 4px 4px 10px rgba(255,255,255,.07), inset -6px -6px 12px rgba(0,0,0,.55); }
+    .bub.out { right: 0; background: #f4f4f4; color: #151515; border-bottom-right-radius: 10px;
+      box-shadow: 0 24px 40px -22px rgba(0,0,0,.8), inset 4px 4px 10px rgba(255,255,255,.95), inset -6px -6px 12px rgba(0,0,0,.18); }
+    .dots { position: absolute; display: flex; gap: 12px; padding: 30px 32px; border-radius: 34px; }
+    .dots.in { left: 0; background: #232326; border-bottom-left-radius: 10px; }
+    .dots.out { right: 0; background: #f4f4f4; border-bottom-right-radius: 10px; }
+    .dots i { width: 16px; height: 16px; border-radius: 50%; background: #8a8a8e; }
+    .who { position: absolute; left: 6px; display: flex; align-items: center; gap: 14px; font-size: 26px; font-weight: 700; color: #a4a4a8; white-space: nowrap; }
+    .who .av { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-size: 16px; font-weight: 700; background: #3a3a3e; color: #f2f2f3; overflow: hidden; flex: none; }
+    .who .av img { width: 40px; height: 40px; display: block; }
+    .who .av.hc { background: #000; box-shadow: 0 0 0 2px rgba(255,255,255,.22); }
+    .who b { color: #f2f2f3; font-weight: 700; }
+    /* evidence card inside a bubble */
+    #n2 { padding: 22px; white-space: normal; width: 660px; }
+    #n2 .bar { display: flex; align-items: center; gap: 12px; font-size: 26px; font-weight: 700; margin: 2px 6px 14px; color: #f2f2f3; }
+    #n2 .grid { border-radius: 18px; overflow: hidden; background: #f8f8f7; color: #151515; }
+    #n2 .r { display: grid; grid-template-columns: 1fr 1.3fr 1fr; padding: 10px 18px; font-size: 26px; font-weight: 600; border-top: 2px solid #e1e1e3; }
+    #n2 .r:first-child { border-top: 0; background: #ececee; color: #3b3b3d; font-weight: 700; }
+    #n2 .ok { display: inline-flex; align-items: center; gap: 10px; margin: 14px 6px 2px; font-size: 26px; font-weight: 700; color: #f2f2f3; }
+    #n4 { font-size: 70px; font-weight: 700; letter-spacing: -0.01em; word-spacing: 0.1em; padding: 24px 42px 28px; }
+    #ch-fgl { position: absolute; inset: 0; pointer-events: none; }
+    .fg { position: absolute; opacity: 0.3; }
+    #ch-vig { position: absolute; inset: 0; background: radial-gradient(ellipse 75% 70% at 50% 50%, transparent 55%, rgba(0,0,0,.55) 100%); pointer-events: none; }
+    #flash { position: absolute; inset: 0; background: #f4f4f4; opacity: 0; }
+  </style>
+  <div id="root" data-composition-id="chat" data-width="1920" data-height="1080" data-layout-allow-overlap>
+    <div class="world-dark"></div>
+    <div id="ch-shake" style="position:absolute;inset:0" data-layout-allow-overflow>
+    <div id="ch-cam" data-layout-allow-overflow>
+      <div id="ch-grid" data-layout-ignore></div>
+      <div class="glow" style="left:500px;top:-100px;width:1000px;height:1000px" data-layout-ignore></div>
+      <div class="glow" style="left:500px;top:1350px;width:1000px;height:1000px" data-layout-ignore></div>
+      <!-- the old way -->
+      <div class="ch-col" id="col-old">
+        <div class="bub out" id="m1" style="top:0">Can you put my invoice emails in a Sheet?<span class="time" data-layout-ignore>10:02</span></div>
+        <div class="who" id="w1" style="top:126px"><span class="av">AI</span><span><b>AI agent</b></span></div>
+        <div class="dots in" id="d1" style="top:178px"><i></i><i></i><i></i></div>
+        <div class="bub in" id="m2" style="top:178px">Done!<span class="time" data-layout-ignore>10:41</span></div>
+        <div class="bub out" id="m3" style="top:298px">the sheet is empty...<span class="time" data-layout-ignore>10:43</span></div>
+        <div class="dots in" id="d2" style="top:418px"><i></i><i></i><i></i></div>
+        <div class="bub in" id="m4" style="top:418px">Done!<span class="time" data-layout-ignore>11:20</span></div>
+        <div class="bub out" id="m5" style="top:538px">bro.<span class="time" data-layout-ignore>11:21</span></div>
+      </div>
+      <!-- the HireCrew way -->
+      <div class="ch-col" id="col-new">
+        <div class="who" id="w2" style="top:0"><span class="av hc"><img src="assets/brand/hirecrew-icon.png" alt="" /></span><span><b>HireCrew agent</b> · verified</span></div>
+        <div class="bub in" id="n1" style="top:52px">Job delivered: 3 rows added to your Sheet.<span class="time" data-layout-ignore>10:05</span></div>
+        <div class="bub in" id="n2" style="top:172px">
+          <div class="bar">Invoices · Sheet1</div>
+          <div class="grid">
+            <div class="r"><span>Date</span><span>Vendor</span><span>Amount</span></div>
+            <div class="r"><span>Oct 27</span><span>Northwind</span><span>$1,240</span></div>
+            <div class="r"><span>Oct 28</span><span>Bluebird</span><span>$860</span></div>
+            <div class="r"><span>Oct 29</span><span>Lumen</span><span>$312</span></div>
+          </div>
+          <div class="ok"><span class="tick tick--light"></span>Read back from your Sheet</div>
+        </div>
+        <div class="bub in" id="n3" style="top:552px">Payment is held until you accept.<span class="time" data-layout-ignore>10:05</span></div>
+        <div class="dots out" id="d3" style="top:672px"><i></i><i></i><i></i></div>
+        <div class="bub out" id="n4" style="top:672px">BRO IT ACTUALLY WORKED</div>
+      </div>
+    </div>
+    </div>
+    <!-- out-of-focus foreground bubbles, passing close to the lens -->
+    <div id="ch-fgl" data-layout-ignore>
+      <div class="fg" id="fg1" style="left:980px;top:820px;width:700px;height:230px;background:radial-gradient(closest-side, rgba(244,244,244,1) 0%, rgba(244,244,244,.55) 50%, rgba(244,244,244,0) 100%)"></div>
+      <div class="fg" id="fg2" style="left:40px;top:120px;width:600px;height:220px;background:radial-gradient(closest-side, rgba(70,70,76,1) 0%, rgba(70,70,76,.55) 50%, rgba(70,70,76,0) 100%)"></div>
+      <div class="fg" id="fg3" style="left:1200px;top:60px;width:660px;height:230px;background:radial-gradient(closest-side, rgba(70,70,76,1) 0%, rgba(70,70,76,.55) 50%, rgba(70,70,76,0) 100%)"></div>
+    </div>
+    <div id="ch-vig" data-layout-ignore></div>
+    <div id="flash"></div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+      // camera state for a focus point (px, py) in cam space at zoom s
+      const at = (px, py, s) => ({ x: 960 - s * px, y: 540 - s * py, scale: s });
+      const cam = (t, px, py, s, d, ease) => tl.to("#ch-cam", Object.assign(at(px, py, s), { duration: d, ease: ease || "power3.inOut" }), t);
+      const pop = (sel, t, from) => tl.fromTo(sel, { opacity: 0, scale: 0.6, y: 26, transformOrigin: from },
+        { opacity: 1, scale: 1, y: 0, duration: 0.34, ease: "back.out(1.9)" }, t);
+      const dots = (sel, t0, t1) => {
+        tl.fromTo(sel, { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.18, ease: "back.out(2)" }, t0);
+        tl.fromTo(sel + " i", { y: 0 }, { y: -9, duration: 0.14, ease: "power1.inOut", stagger: { each: 0.07, yoyo: true, repeat: Math.max(1, Math.round((t1 - t0) / 0.3)) } }, t0 + 0.05);
+        tl.to(sel, { opacity: 0, scale: 0.6, duration: 0.1 }, t1);
+      };
+      tl.set(".ch-col .bub:not(#m1), .ch-col .dots, .ch-col .who", { opacity: 0 }, 0);
+
+      // ---- the old way, shot close and tracking each message ----
+      tl.fromTo("#ch-cam", at(1080, 360, 1.85), Object.assign(at(1060, 350, 1.72), { duration: 1.2, ease: "power2.out", immediateRender: true }), 0);
+      tl.fromTo("#m1", { opacity: 1, scale: 0.94, y: 14, transformOrigin: "100% 100%" }, { opacity: 1, scale: 1, y: 0, duration: 0.35, ease: "back.out(1.9)", immediateRender: true }, 0);
+      cam(0.78, 930, 500, 1.62, 0.55);
+      tl.fromTo("#w1", { opacity: 0, x: -16 }, { opacity: 1, x: 0, duration: 0.25, ease: "power2.out" }, 1.1);
+      dots("#d1", 0.9, 1.38);
+      pop("#m2", 1.4, "0% 100%");
+      cam(1.95, 1010, 625, 1.6, 0.45);
+      pop("#m3", 2.15, "100% 100%");
+      cam(2.7, 930, 745, 1.6, 0.45);
+      dots("#d2", 2.78, 3.22);
+      pop("#m4", 3.25, "0% 100%");
+      // pull out wide for the punchline
+      cam(3.45, 960, 625, 1.0, 0.55, "power3.inOut");
+      pop("#m5", 3.85, "100% 100%");
+      tl.to("#ch-cam", Object.assign(at(1000, 660, 1.08), { duration: 0.12, ease: "power2.out" }), 3.95);
+      tl.to("#ch-cam", Object.assign(at(990, 650, 1.04), { duration: 0.35, ease: "expo.out" }), 4.07);
+
+      // ---- swipe down to the HireCrew chat ----
+      cam(4.42, 900, 1640, 1.62, 0.55, "power4.inOut");
+      tl.to("#col-old", { opacity: 0, duration: 0.3, ease: "power1.in" }, 4.55);
+      tl.fromTo("#w2", { opacity: 0, x: -16 }, { opacity: 1, x: 0, duration: 0.25, ease: "power2.out" }, 4.8);
+      pop("#n1", 4.95, "0% 100%");
+      cam(5.45, 840, 1830, 1.32, 0.5);
+      pop("#n2", 5.55, "0% 100%");
+      tl.fromTo("#n2 .r", { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.2, stagger: 0.09, ease: "expo.out" }, 5.75);
+      tl.fromTo("#n2 .tick", { scale: 0 }, { scale: 1, duration: 0.3, ease: "back.out(2.6)" }, 6.15);
+      cam(6.3, 800, 1990, 1.28, 0.5);
+      pop("#n3", 6.45, "0% 100%");
+      cam(6.95, 960, 1905, 0.98, 0.55);
+      dots("#d3", 7.0, 7.52);
+      // the payoff reply: big, caps, with a punch-in
+      pop("#n4", 7.55, "100% 100%");
+      tl.to("#ch-cam", Object.assign(at(975, 2230, 1.5), { duration: 0.18, ease: "power3.out" }), 7.62);
+      tl.to("#ch-cam", Object.assign(at(975, 2235, 1.42), { duration: 0.6, ease: "expo.out" }), 7.8);
+      tl.fromTo("#ch-shake", { x: 0 }, { keyframes: [{ x: -10 }, { x: 9 }, { x: -5 }, { x: 0 }], duration: 0.24, ease: "none", immediateRender: false }, 7.64);
+      // zoom through the white bubble into the light world
+      tl.to("#ch-cam", Object.assign(at(975, 2240, 10), { duration: 0.5, ease: "power3.in" }), 8.45);
+      tl.to("#flash", { opacity: 1, duration: 0.14, ease: "power2.in" }, 8.82);
+
+      // depth passes in the foreground and a slow drift
+      tl.fromTo("#fg1", { x: 100 }, { x: -800, duration: 4.4, ease: "none" }, 0);
+      tl.fromTo("#fg2", { x: -60, y: 0 }, { x: 420, y: -60, duration: 4.4, ease: "none" }, 0);
+      tl.fromTo("#fg3", { x: 100, opacity: 0 }, { x: -800, opacity: 0.3, duration: 4.0, ease: "none" }, 4.6);
+      tl.to(["#fg1", "#fg2"], { opacity: 0, duration: 0.4 }, 4.4);
+      window.__timelines["chat"] = tl;
+    })();
+  </script>
+</template>

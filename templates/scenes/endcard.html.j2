@@ -1,0 +1,92 @@
+{% import "_lib.j2" as lib with context %}
+{#- Name reveal end card (original: end.html; reference: "I'm Aidenframes" typing reveal, ends on black).
+    s.type_text: "This is"   s.logo: assets/brand/hirecrew-logo-trim.png   s.tagline: "Pay only for [finished work.]"
+    s.cta: "Join HireCrew →"   s.fade_black: true   s.world: light|dark -#}
+{%- set d = s.duration -%}
+{%- set dark = s.world == 'dark' -%}
+{%- set txt = s.type_text or 'This is' -%}
+{%- set t_type = 0.15 -%}{%- set type_d = [0.06 * txt|length, 0.3]|max -%}
+{%- set t_logo = t_type + type_d + 0.15 -%}
+{%- set t_tag = [t_logo + 0.75, [d - 3.0, t_logo + 0.3]|max]|min -%}
+{%- set t_cta = [t_tag + 0.8, [d - 2.7, t_tag + 0.3]|max]|min -%}
+{%- set t_click = t_cta + 1.0 -%}
+<template>
+  <style>
+    #{{ id }}-root { position: absolute; inset: 0; overflow: hidden; }
+    #{{ id }}-cam { position: absolute; inset: 0; transform-origin: 50% 45%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: {{ (56*u)|round }}px; }
+    #{{ id }}-row { display: flex; align-items: center; justify-content: center; gap: {{ (40*u)|round }}px; }
+    #{{ id }}-this { position: relative; font-family: {{ T.font_display }};{% if T.display_upper %} text-transform: uppercase;{% endif %}  display: inline-block; font-size: {{ (120*u)|round }}px; font-weight: 700; letter-spacing: -0.045em; color: {{ T.on_dark if dark else T.on_light }}; white-space: nowrap; }
+    #{{ id }}-ghost { visibility: hidden; }
+    #{{ id }}-typed { position: absolute; left: 0; top: 0; white-space: nowrap; }
+    #{{ id }}-caret { display: inline-block; width: {{ (8*u)|round }}px; height: 0.9em; margin-left: {{ (8*u)|round }}px; background: currentColor; vertical-align: -0.1em; }
+    #{{ id }}-tile { width: {{ (300*u)|round }}px; height: {{ (300*u)|round }}px; border-radius: 21%; background: #000; overflow: hidden; display: grid; place-items: center; flex: none; }
+    #{{ id }}-tile img { width: 75%; height: auto; display: block; }
+    #{{ id }}-l { font-family: {{ T.font_display }};{% if T.display_upper %} text-transform: uppercase;{% endif %} max-width:  {{ (W*0.9)|round }}px; text-align: center; font-size: {{ (64*u)|round }}px; font-weight: 700; letter-spacing: -0.04em; color: {{ T.on_dark if dark else T.on_light }}; }
+    #{{ id }}-l .w { display: inline-block; margin-right: 0.2em; }
+    #{{ id }}-l .w:last-child { margin-right: 0; }
+    #{{ id }}-bw { position: relative; }
+    #{{ id }}-b { height: {{ (100*u)|round }}px; padding: 0 {{ (56*u)|round }}px; font-size: {{ (38*u)|round }}px; }
+    #{{ id }}-bw .rf-cursor { left: 60%; top: 55%; width: {{ (64*u)|round }}px; height: {{ (76*u)|round }}px; }
+    #{{ id }}-black { position: absolute; inset: 0; background: #000; opacity: 0; z-index: 60; }
+  </style>
+  <div id="{{ id }}-root" data-composition-id="{{ id }}" data-width="{{ W }}" data-height="{{ H }}" data-layout-allow-overlap>
+    {{ lib.world(s.world or 'light', id) }}
+    <div id="{{ id }}-cam" data-layout-allow-overflow>
+      <div id="{{ id }}-row">
+        <span id="{{ id }}-this"><span id="{{ id }}-ghost">{{ txt }}<span class="caretspace" style="display:inline-block;width:{{ (16*u)|round }}px"></span></span><span id="{{ id }}-typed"><span id="{{ id }}-txt"></span><span id="{{ id }}-caret"></span></span></span>
+        {%- if s.logo %}
+        <div id="{{ id }}-tile" class="clay"><img src="{{ s.logo }}" alt="" /></div>
+        {%- endif %}
+      </div>
+      {%- if s.tagline %}
+      <p id="{{ id }}-l">{{ lib.words(s.tagline, dark) }}</p>
+      {%- endif %}
+      {%- if s.cta %}
+      <div id="{{ id }}-bw"><span id="{{ id }}-b" class="btn {{ 'btn--light' if dark else 'btn--dark' }}">{{ s.cta }}</span>{{ lib.cursor(id ~ '-cur') }}</div>
+      {%- endif %}
+    </div>
+    <div id="{{ id }}-black"></div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo("#{{ id }}-cam", { opacity: 0 }, { opacity: 1, duration: 0.2 }, 0);
+      const ty = { n: 0 }, full = {{ txt|tojson }};
+      const typ = () => { document.getElementById("{{ id }}-txt").textContent = full.slice(0, Math.round(ty.n)); };
+      tl.fromTo(ty, { n: 0 }, { n: full.length, duration: {{ type_d }}, ease: "none", onUpdate: typ, onStart: typ, onComplete: typ, immediateRender: true }, {{ t_type }});
+      {%- for i in range(txt|length) %}{% if txt[i] != ' ' and i % 2 == 0 %}{{ cue('key-press', s.start + t_type + type_d * i / txt|length, 0.45) }}{% endif %}{% endfor %}
+      tl.fromTo("#{{ id }}-caret", { opacity: 1 }, { keyframes: [{ opacity: 0 }, { opacity: 1 }, { opacity: 0 }, { opacity: 1 }, { opacity: 0 }], duration: 1.6, ease: "steps(5)" }, {{ t_type + type_d }});
+      {%- if s.logo %}
+      tl.fromTo("#{{ id }}-tile", { opacity: 0, scale: 0.2, rotation: -20 }, { opacity: 1, scale: 1, rotation: 0, duration: 0.5, ease: "back.out(1.8)" }, {{ t_logo }});
+      tl.fromTo("#{{ id }}-tile img", { scale: 1.4, filter: "blur(16px)" }, { scale: 1, filter: "blur(0px)", duration: 0.45, ease: "expo.out" }, {{ t_logo + 0.1 }});
+      {{- cue('impact-bass-2', s.start + t_logo + 0.05, 0.7) }}
+      {%- endif %}
+      {%- if s.tagline %}
+      {%- if has_plain(s.tagline) %}
+      tl.fromTo("#{{ id }}-l .w:not(.acc)", { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.16, stagger: 0.1, ease: "power2.out" }, {{ t_tag }});
+      {%- endif %}{% if '[' in s.tagline %}
+      tl.fromTo("#{{ id }}-l .acc", { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.35, ease: "back.out(2.4)" }, {{ t_tag + 0.3 }});
+      {%- endif %}
+      {{- cue('pop', s.start + t_tag + 0.35, 0.6) }}
+      {%- endif %}
+      {%- if s.cta %}
+      tl.fromTo("#{{ id }}-b", { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.4, ease: "back.out(1.8)" }, {{ t_cta }});
+      {{- cue('pop-hi', s.start + t_cta + 0.1, 0.6) }}
+      {%- if t_click + 0.6 < d %}
+      tl.fromTo("#{{ id }}-cur", { x: {{ (W*0.5)|round }}, y: {{ (H*0.4)|round }}, opacity: 0 }, { x: 0, y: 0, opacity: 1, duration: 0.5, ease: "power3.out" }, {{ t_click - 0.6 }});
+      tl.to("#{{ id }}-cur", { scale: 0.85, duration: 0.07, yoyo: true, repeat: 1 }, {{ t_click }});
+      tl.to("#{{ id }}-b", { scale: 0.93, duration: 0.07, yoyo: true, repeat: 1 }, {{ t_click }});
+      tl.to("#{{ id }}-cur", { opacity: 0, duration: 0.3 }, {{ t_click + 0.5 }});
+      {{- cue('click', s.start + t_click, 1.0) }}{{ cue('key-press', s.start + t_click, 0.8) }}{{ cue('pop-lo', s.start + t_click + 0.02, 0.8) }}{{ duck(s.start + t_click) }}
+      {%- else %}
+      tl.set("#{{ id }}-cur", { opacity: 0 }, 0);
+      {%- endif %}
+      {%- endif %}
+      tl.fromTo("#{{ id }}-cam", { scale: 1 }, { scale: 1.05, duration: {{ d - 0.2 }}, ease: "none", immediateRender: false }, 0.2);
+      {%- if s.fade_black is not defined or s.fade_black %}
+      tl.fromTo("#{{ id }}-black", { opacity: 0 }, { opacity: 1, duration: 0.6, ease: "power2.in" }, {{ d - 0.65 }});
+      {%- endif %}
+      window.__timelines["{{ id }}"] = tl;
+    })();
+  </script>
+</template>

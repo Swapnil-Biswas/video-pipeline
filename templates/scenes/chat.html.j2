@@ -1,0 +1,110 @@
+{% import "_lib.j2" as lib with context %}
+{#- Chat story with a tracking camera (original: video-showreel chat.html v2).
+    Layout and the camera path come from compose.chat_layout() as L:
+      L.msgs [{id, side, text, time, big, x, y, w, h, t, dots, label}]  L.labels [{id, x, y, text, avatar, t}]
+      L.cams [{t, d, x, y, s, ease}]  L.col {left, width}  L.zoom_through {x, y, t} | none  L.first_visible
+    s.world is always dark for chat. -#}
+{%- set d = s.duration -%}
+<template>
+  <style>
+    #{{ id }}-root { position: absolute; inset: 0; overflow: hidden; }
+    #{{ id }}-shake { position: absolute; inset: 0; }
+    #{{ id }}-cam { position: absolute; left: 0; top: 0; width: {{ W }}px; height: {{ H }}px; transform-origin: 0 0; }
+    #{{ id }}-grid { position: absolute; left: {{ -W }}px; top: {{ -H }}px; width: {{ W*3 }}px; height: {{ (L.height + H*2)|round }}px;
+      background-image: radial-gradient(rgba(255,255,255,.075) 2px, transparent 2.5px); background-size: 46px 46px; }
+    #{{ id }}-root .bub { position: absolute; padding: {{ (22*u)|round }}px {{ (32*u)|round }}px {{ (24*u)|round }}px; border-radius: {{ (34*u)|round }}px; font-size: {{ (40*u)|round }}px; font-weight: 600; letter-spacing: -0.005em; word-spacing: 0.04em; line-height: 1.2; }
+    #{{ id }}-root .bub .time { display: inline-block; margin-left: {{ (18*u)|round }}px; font-size: {{ (22*u)|round }}px; font-weight: 600; opacity: .55; vertical-align: middle; white-space: nowrap; }
+    #{{ id }}-root .bub.in { background: {{ T.card_dark }}; color: {{ T.on_dark }}; border-bottom-left-radius: {{ (10*u)|round }}px;
+      box-shadow: 0 24px 40px -22px rgba(0,0,0,.8), inset 4px 4px 10px rgba(255,255,255,.07), inset -6px -6px 12px rgba(0,0,0,.55); }
+    #{{ id }}-root .bub.out { background: {{ T.paper }}; color: {{ T.on_light }}; border-bottom-right-radius: {{ (10*u)|round }}px;
+      box-shadow: 0 24px 40px -22px rgba(0,0,0,.8), inset 4px 4px 10px rgba(255,255,255,.95), inset -6px -6px 12px rgba(0,0,0,.18); }
+    #{{ id }}-root .bub.big { font-size: {{ (70*u)|round }}px; font-weight: 700; letter-spacing: -0.01em; word-spacing: 0.1em; padding: {{ (24*u)|round }}px {{ (42*u)|round }}px {{ (28*u)|round }}px; }
+    #{{ id }}-root .dots { position: absolute; display: flex; gap: {{ (12*u)|round }}px; padding: {{ (30*u)|round }}px {{ (32*u)|round }}px; border-radius: {{ (34*u)|round }}px; }
+    #{{ id }}-root .dots.in { background: {{ T.card_dark }}; border-bottom-left-radius: {{ (10*u)|round }}px; }
+    #{{ id }}-root .dots.out { background: {{ T.paper }}; border-bottom-right-radius: {{ (10*u)|round }}px; }
+    #{{ id }}-root .dots i { width: {{ (16*u)|round }}px; height: {{ (16*u)|round }}px; border-radius: 50%; background: {{ T.on_dark_2 }}; }
+    #{{ id }}-root .who { position: absolute; display: flex; align-items: center; gap: {{ (14*u)|round }}px; font-size: {{ (26*u)|round }}px; font-weight: 700; color: {{ T.on_dark_2 }}; white-space: nowrap; }
+    #{{ id }}-root .who .av { width: {{ (40*u)|round }}px; height: {{ (40*u)|round }}px; border-radius: 50%; display: grid; place-items: center; font-size: {{ (16*u)|round }}px; font-weight: 700; background: {{ T.card_dark_3 }}; color: {{ T.on_dark }}; overflow: hidden; flex: none; }
+    #{{ id }}-root .who .av.img { background: #000; box-shadow: 0 0 0 2px rgba(255,255,255,.22); }
+    #{{ id }}-root .who .av img { width: 100%; height: 100%; display: block; }
+    #{{ id }}-root .who b { color: {{ T.on_dark }}; }
+    #{{ id }}-root .bub, #{{ id }}-root .dots, #{{ id }}-root .who { opacity: 0; }
+    #{{ id }}-root .fg { position: absolute; opacity: 0.3; pointer-events: none; }
+    #{{ id }}-vig { position: absolute; inset: 0; background: radial-gradient(ellipse 75% 70% at 50% 50%, transparent 55%, rgba(0,0,0,.55) 100%); pointer-events: none; }
+    #{{ id }}-flash { position: absolute; inset: 0; background: {{ T.paper }}; opacity: 0; pointer-events: none; }
+  </style>
+  <div id="{{ id }}-root" data-composition-id="{{ id }}" data-width="{{ W }}" data-height="{{ H }}" data-layout-allow-overlap>
+    <div class="world-dark"></div>
+    <div id="{{ id }}-shake" data-layout-allow-overflow>
+      <div id="{{ id }}-cam" data-layout-allow-overflow>
+        <div id="{{ id }}-grid" data-layout-ignore></div>
+        {%- for g in L.glows %}
+        <div class="glow" data-layout-ignore style="left:{{ g.x|round }}px;top:{{ g.y|round }}px;width:{{ g.r|round }}px;height:{{ g.r|round }}px"></div>
+        {%- endfor %}
+        {%- for l in L.labels %}
+        <div class="who g{{ l.g }}" id="{{ l.id }}" style="left:{{ l.x|round }}px;top:{{ l.y|round }}px"><span data-layout-ignore class="av{% if l.avatar and '.' in l.avatar %} img{% endif %}">{% if l.avatar and '.' in l.avatar %}<img src="{{ l.avatar }}" alt="" />{% else %}{{ l.avatar or l.text[:2] }}{% endif %}</span><span><b>{{ l.text }}</b>{% if l.note %} · {{ l.note }}{% endif %}</span></div>
+        {%- endfor %}
+        {%- for m in L.msgs %}
+        {%- if m.dots %}
+        <div class="dots {{ m.side }} g{{ m.g }}" id="{{ m.id }}-d" style="{{ 'left' if m.side == 'in' else 'right' }}:{{ m.edge|round }}px;top:{{ m.y|round }}px"><i></i><i></i><i></i></div>
+        {%- endif %}
+        <div class="bub {{ m.side }} g{{ m.g }}{% if m.big %} big{% endif %}" id="{{ m.id }}" style="{{ 'left' if m.side == 'in' else 'right' }}:{{ m.edge|round }}px;top:{{ m.y|round }}px;max-width:{{ m.maxw|round }}px;{% if m.nowrap %}white-space:nowrap;{% endif %}">{{ m.text }}{% if m.time %}<span class="time" data-layout-ignore>{{ m.time }}</span>{% endif %}</div>
+        {%- endfor %}
+      </div>
+    </div>
+    {%- set fgs = [(0.55,0.78,0.36,0.21,'244,244,244'),(0.05,0.12,0.31,0.2,'70,70,76'),(0.6,0.07,0.34,0.21,'70,70,76')] %}
+    {%- for f in fgs %}
+    <div class="fg" id="{{ id }}-fg{{ loop.index0 }}" data-layout-ignore style="left:{{ (W*f[0])|round }}px;top:{{ (H*f[1])|round }}px;width:{{ (W*f[2])|round }}px;height:{{ (H*f[3])|round }}px;background:radial-gradient(closest-side, rgba({{ f[4] }},1) 0%, rgba({{ f[4] }},.55) 50%, rgba({{ f[4] }},0) 100%)"></div>
+    {%- endfor %}
+    <div id="{{ id }}-vig" data-layout-ignore></div>
+    <div id="{{ id }}-flash"></div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+      const at = (px, py, s) => ({ x: {{ W/2 }} - s * px, y: {{ H/2 }} - s * py, scale: s });
+      {%- set c0 = L.cams[0] %}
+      tl.fromTo("#{{ id }}-cam", at({{ c0.x }}, {{ c0.y }}, {{ c0.s * 1.07 }}), Object.assign(at({{ c0.x }}, {{ c0.y }}, {{ c0.s }}), { duration: 1.2, ease: "power2.out", immediateRender: true }), 0);
+      {%- for c in L.cams[1:] %}
+      tl.to("#{{ id }}-cam", Object.assign(at({{ c.x }}, {{ c.y }}, {{ c.s }}), { duration: {{ c.d }}, ease: "{{ c.ease }}" }), {{ c.t }});
+      {%- endfor %}
+      {%- for l in L.labels %}
+      tl.fromTo("#{{ l.id }}", { opacity: 0, x: {{ (-16*u)|round }} }, { opacity: 1, x: 0, duration: 0.25, ease: "power2.out" }, {{ l.t }});
+      {%- endfor %}
+      {%- for m in L.msgs %}
+      {%- if m.dots %}
+      tl.fromTo("#{{ m.id }}-d", { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.18, ease: "back.out(2)" }, {{ m.t - 0.5 }});
+      tl.fromTo("#{{ m.id }}-d i", { y: 0 }, { y: {{ (-9*u)|round }}, duration: 0.14, ease: "power1.inOut", stagger: { each: 0.07, yoyo: true, repeat: 1 } }, {{ m.t - 0.45 }});
+      tl.to("#{{ m.id }}-d", { opacity: 0, scale: 0.6, duration: 0.08 }, {{ m.t - 0.06 }});
+      {{- cue('key-press', s.start + m.t - 0.4, 0.4) }}{{ cue('key-press', s.start + m.t - 0.22, 0.35) }}
+      {%- endif %}
+      {%- if loop.first and L.first_visible %}
+      tl.fromTo("#{{ m.id }}", { opacity: 1, scale: 0.94, y: {{ (14*u)|round }}, transformOrigin: "100% 100%" }, { opacity: 1, scale: 1, y: 0, duration: 0.35, ease: "back.out(1.9)", immediateRender: true }, 0);
+      {{- cue('pop-hi', s.start + 0.05, 0.5) }}
+      {%- else %}
+      tl.fromTo("#{{ m.id }}", { opacity: 0, scale: 0.6, y: {{ (26*u)|round }}, transformOrigin: "{{ '0% 100%' if m.side == 'in' else '100% 100%' }}" }, { opacity: 1, scale: 1, y: 0, duration: 0.34, ease: "back.out(1.9)" }, {{ m.t }});
+      {{- cue('pop-lo' if m.side == 'in' else 'pop-hi', s.start + m.t + 0.05, 0.6) }}
+      {%- endif %}
+      {%- if m.big %}
+      tl.fromTo("#{{ id }}-shake", { x: 0 }, { keyframes: [{ x: -10 }, { x: 9 }, { x: -5 }, { x: 0 }], duration: 0.24, ease: "none", immediateRender: false }, {{ m.t + 0.09 }});
+      {{- cue('impact-bass-1', s.start + m.t + 0.11, 0.55) }}
+      {%- endif %}
+      {%- endfor %}
+      {%- for sw in L.swipes %}
+      tl.to("#{{ id }}-root .g{{ sw.g }}", { opacity: 0, duration: 0.3, ease: "power1.in" }, {{ sw.t + 0.12 }});
+      {{- cue('whoosh', s.start + sw.t + 0.18, 0.55) }}
+      {%- endfor %}
+      {%- if L.zoom_through %}{% set z = L.zoom_through %}
+      tl.to("#{{ id }}-cam", Object.assign(at({{ z.x }}, {{ z.y }}, {{ z.s }}), { duration: 0.5, ease: "power3.in" }), {{ d - 0.55 }});
+      tl.to("#{{ id }}-flash", { opacity: 1, duration: 0.14, ease: "power2.in" }, {{ d - 0.18 }});
+      {{- cue('whoosh-cinematic', s.start + d - 0.05, 0.6) }}
+      {%- elif s.exit %}
+{{ lib.exit_js(s.exit, id ~ '-shake', id ~ '-flash', d) }}
+      {%- endif %}
+      tl.fromTo("#{{ id }}-fg0", { x: {{ (W*0.05)|round }} }, { x: {{ (-W*0.42)|round }}, duration: {{ d }}, ease: "none" }, 0);
+      tl.fromTo("#{{ id }}-fg1", { x: {{ (-W*0.03)|round }}, y: 0 }, { x: {{ (W*0.22)|round }}, y: {{ (-H*0.05)|round }}, duration: {{ d }}, ease: "none" }, 0);
+      tl.fromTo("#{{ id }}-fg2", { x: {{ (W*0.05)|round }} }, { x: {{ (-W*0.4)|round }}, duration: {{ d }}, ease: "none" }, 0);
+      window.__timelines["{{ id }}"] = tl;
+    })();
+  </script>
+</template>

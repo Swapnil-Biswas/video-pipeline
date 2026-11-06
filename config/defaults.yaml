@@ -1,0 +1,155 @@
+# reelforge defaults. A project's project.yaml overrides any key (deep merge).
+# Values marked "original" are the exact settings used for the HireCrew showreel.
+
+canvas:
+  width: 1920
+  height: 1080
+  fps: 60                 # original: 60 (matches the reference reel)
+  motion_blur: true       # original: data-motion-blur="on"
+
+style:
+  css: [style/hirecrew-bw.css]      # brand head CSS (tokens, clay classes, worlds)
+  from_reference: false   # true: learn pacing, transitions, palette, fonts, captions, grade and music from references[0]
+  ocr: true               # read the reference's on-screen text (EasyOCR) for caption style and font
+  grade: true             # match the footage's colour grade to the reference (HyperFrames realtime grading)
+  gsap: "https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"
+  font_family: '"Instrument Sans", sans-serif'
+
+# folders copied into the generated HyperFrames project under assets/<folder name>
+assets: [assets/fonts, assets/brand, assets/sfx]
+
+references: []            # [{url: ...} | {src: path}]  -> ingest + analyze
+footage: []               # [{src: path | url, id: name, trim: [start, end]}]  -> ingest (copied to assets/footage)
+
+aroll:                    # talking-head / main footage whose sound drives the edit
+  video: null             # a footage id; its audio becomes one continuous dialogue track, re-cut with the picture
+  name: null              # optional lower-third name tag, e.g. "Ali · Creator"
+
+transcribe:               # Whisper on the GPU (transformers)
+  enabled: false
+  model: openai/whisper-large-v3-turbo        # word timings in the spoken language
+  translate_model: openai/whisper-large-v3    # per-phrase translation to English (turbo cannot translate)
+  language: null          # null = detect; e.g. ur, hi, en
+  translate_to_english: auto   # auto = when the speech is not English
+  phrase_gap: 0.28        # a pause this long starts a new phrase
+  max_phrase_s: 3.2
+  max_phrase_words: 9
+  window_gap: 0.3         # translation windows break at pauses this long (after 2 s of speech)
+  max_window_s: 7.0
+  fixes: []               # caption proofreading: [[regex, replacement], ...] applied to the caption text
+
+autoedit:                 # used when a project sets `scenes: auto` (talking-head editing from the transcript)
+  trim_silence: true
+  min_gap: 0.32           # pauses longer than this are cut out
+  pad: 0.08               # seconds kept around speech
+  min_shot: 1.3           # jump-cut rhythm
+  max_shot: 4.2
+  punch: 1.14             # punch-in framing used on every other shot
+  punch_every: 3          # a zoom-punch transition every Nth cut (others are hard cuts)
+  cutaways: true          # full-screen motion graphics for lists said aloud
+  list_heading: null      # e.g. "What you [need]"
+  keyword_min_score: 2.0
+  keyword_spacing: 3.0    # seconds between keyword pop-ups
+  hook: true              # hook title over the first shot (from the first sentence unless hook_text is set)
+  hook_text: null         # [[line, size], ...]
+  outro: null             # e.g. {type: kinetic, duration: 2.6, lines: [{text: "Still want to [start?]", size: 130}]}
+  progress_bar: true
+  mode: auto              # auto: talking-head when the A-roll has speech, else montage | talk | montage
+  min_words_for_talk: 8
+  max_duration: 30        # montage length cap (seconds)
+  keep_footage_audio: false   # montage: keep each clip's own sound under the music
+  transition_weights: null    # {cut, flash, zoom-blur, punch}; learned from the reference when style.from_reference
+
+analyze:
+  sheet_fps: 4            # original: 4 fps contact sheets
+  sheet_tile: [4, 7]      # columns x rows per sheet (original final audit: 4x7 at 480 px)
+  sheet_width: 480
+  sheet_seconds: 7
+  scene_threshold: 0.25   # original: select='gt(scene,0.25)'
+  onset_delta: 0.3        # original librosa onset_detect delta
+  bands: [[20, 150], [150, 1000], [1000, 4000], [4000, 11025]]
+
+music:
+  mode: none              # none | file (use as-is) | take (arrange a chosen take) | generate (MusicGen, then score + arrange)
+  file: null
+  take: null
+  takes_dir: null         # mode take with take=null: score every wav here and pick the best
+  generate:
+    model: facebook/musicgen-stereo-medium     # original
+    prompts_key: showreel                      # config/prompts.yaml -> musicgen.<key>
+    seeds: [101, 202, 303, 404, 505, 606]      # original
+    guidance_scale: 3.5                        # original
+    max_new_tokens: 1500                       # original (~30 s)
+  arrange:
+    bpm: 124              # original; null = keep the take's tempo
+    drop: 9.0             # original: a strong beat lands on this film time
+    intro_lowpass: true   # original: 700 Hz -> 3 kHz opening over the last bar before the drop
+    dark_cut: 700
+    dark_gain: 0.62
+    mid_cut: 3000
+    mid_gain: 0.8
+    fade_out: 2.0
+    loop_crossfade: 0.04  # takes shorter than the film are looped by whole bars with this crossfade
+    master_chain: "highpass=f=45:p=2,lowshelf=f=140:g=-7,equalizer=f=380:t=q:w=1.0:g=2,equalizer=f=2600:t=q:w=1.0:g=4,highshelf=f=8000:g=3.5,acompressor=threshold=-16dB:ratio=2.2:attack=12:release=160:makeup=1.5,alimiter=limit=0.9:attack=3:release=60:level=false"
+    lufs: -14
+  volume: 0.85            # original music data-volume
+  volume_under_voice: 0.18
+  duck:
+    at_clicks: true       # original: duck to 0.4 around every cursor click
+    level: 0.4
+    under_speech: true    # sit the bed at volume_under_voice while the transcript/voice has words
+
+voice:
+  mode: none              # none | file (vo.wav + words.json) | heygen (lines -> HeyGen TTS)
+  file: null
+  words: null
+  lines: []               # heygen: [{id, text, gap}]
+  voice_id: dff185982cf84b91a246dace28badb71   # HeyGen "Joelle" (used in film 1)
+  lang: null              # e.g. hi
+  speed: 1.0
+  atempo: 1.0             # reel used 1.15
+  start: 0.0              # film time where the voice track starts
+  volume: 1.0
+  chain: "highpass=f=85:p=2,equalizer=f=250:t=q:w=1.2:g=-2,equalizer=f=3200:t=q:w=1.0:g=2.5,highshelf=f=9000:g=1.5,acompressor=threshold=-20dB:ratio=3:attack=8:release=120:makeup=2,loudnorm=I=-16:TP=-2:LRA=7"
+  heygen_script: "~/.claude/skills/media-use/audio/scripts/heygen-tts.mjs"
+
+captions:
+  enabled: false          # word-synced captions from the transcript (or the voice words)
+  style: subtle           # subtle: small boxed line | reel: bold 2-4 word groups, active word in a pill
+  max_words: 4
+  size: 34                # subtle style size; reel style uses reel_size
+  reel_size: 62
+  bottom: 70              # px from the bottom (subtle); reel style sits at reel_y (fraction of height)
+  reel_y: 0.74
+
+sfx:
+  auto: true              # use cues the scene templates emit (pop on bubbles, whoosh on transitions, click on cursor)
+  cues: []                # manual cues: [file, film_time, volume]
+  peaks: {}               # optional file -> seconds-to-peak; measured with `hyperframes audio --json` and cached
+  frame_offset: 1         # original: the sound peak lands 1 frame after its picture event
+
+preview:
+  extra_at: []            # extra snapshot times
+  seams: true             # 5-frame strips around every cut (hyperframes snapshot --review)
+  require_approval: true
+
+render:
+  resolution: landscape-4k   # original
+  quality: delivery          # original
+  gpu: true                  # original (NVENC encode)
+  workers: auto
+  set_gpu_preference: true   # Windows: point chrome-headless-shell at the high-performance GPU
+  timeout: 7200
+
+master:
+  lufs: -14               # original
+  true_peak: -1.5         # original
+  lra: 11                 # original final pass
+  limiter: 0.84           # original
+  aac_bitrate: 320k       # original
+  sample_rate: 48000
+
+audit:
+  sheet_fps: 4
+  sheet_width: 480
+  sheet_tile: [4, 7]

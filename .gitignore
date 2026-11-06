@@ -1,0 +1,17 @@
+# generated output
+build/
+jobs/
+renders/
+.hyperframes/
+__pycache__/
+*.pyc
+.snap/
+
+# third-party reference videos (owned by their creators; download them yourself, see refs/README.md)
+projects/*/refs/*.mp4
+projects/*/refs/*.info.json
+
+# local environment
+.env
+.venv/
+venv/

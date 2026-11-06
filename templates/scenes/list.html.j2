@@ -1,0 +1,57 @@
+{% import "_lib.j2" as lib with context %}
+{#- Checklist cutaway: what the speaker lists becomes a full-screen motion graphic, each item landing on its word.
+    s.heading: "What you [need]"   s['items']: ["Good camera", ...]   s.times: [seconds into the scene | null, ...]
+    s.icons: optional glyph per item (default: picked from the item text)   s.world: dark|light -#}
+{%- set d = s.duration -%}
+{%- set dark = s.world != 'light' -%}
+{%- set n = s['items']|length -%}
+<template>
+  <style>
+    #{{ id }}-root { position: absolute; inset: 0; overflow: hidden; }
+    #{{ id }}-cam { position: absolute; inset: 0; transform-origin: 50% 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: {{ (46*u)|round }}px; }
+    #{{ id }}-h { font-family: {{ T.font_display }};{% if T.display_upper %} text-transform: uppercase;{% endif %} max-width:  {{ (W*0.9)|round }}px; text-align: center; font-size: {{ (104*u)|round }}px; font-weight: 700; letter-spacing: -0.04em; line-height: 1.04; color: {{ T.on_dark if dark else T.on_light }}; }
+    #{{ id }}-h .w { display: inline-block; margin-right: 0.2em; }
+    #{{ id }}-h .w:last-child { margin-right: 0; }
+    #{{ id }}-list { display: grid; gap: {{ (22*u)|round }}px; width: {{ ([820*u, W*0.86]|min)|round }}px; }
+    #{{ id }}-root .it { display: flex; align-items: center; gap: {{ (24*u)|round }}px; padding: {{ (20*u)|round }}px {{ (28*u)|round }}px; border-radius: {{ (32*u)|round }}px; font-size: {{ (50*u)|round }}px; font-weight: 700; letter-spacing: -0.02em;
+      {% if dark %}background: {{ T.card_dark }}; color: {{ T.on_dark }}; box-shadow: 0 30px 50px -26px rgba(0,0,0,.9), inset 4px 4px 10px rgba(255,255,255,.06), inset -6px -6px 12px rgba(0,0,0,.5);{% endif %} }
+    #{{ id }}-root .it .ic { width: {{ (84*u)|round }}px; height: {{ (84*u)|round }}px; border-radius: 30%; display: grid; place-items: center; flex: none; background: {{ T.paper if dark else T.accent }}; color: {{ T.on_light if dark else T.on_accent }}; }
+    #{{ id }}-root .it .ic svg { width: 56%; height: 56%; fill: none; stroke: currentColor; stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; }
+    #{{ id }}-root .it .tk { margin-left: auto; width: {{ (46*u)|round }}px; height: {{ (46*u)|round }}px; }
+    #{{ id }}-flash { position: absolute; inset: 0; background: {{ T.paper }}; opacity: 0; pointer-events: none; }
+  </style>
+  <div id="{{ id }}-root" data-composition-id="{{ id }}" data-width="{{ W }}" data-height="{{ H }}" data-layout-allow-overlap>
+    {{ lib.world('dark' if dark else 'light', id) }}
+    <div id="{{ id }}-cam" data-layout-allow-overflow>
+      <p id="{{ id }}-h">{{ lib.words(s.heading or 'What you [need]', dark) }}</p>
+      <div id="{{ id }}-list">
+        {%- for it in s['items'] %}
+        <div class="it{{ '' if dark else ' clay clay--surface' }}" id="{{ id }}-i{{ loop.index0 }}"><span class="ic">{{ lib.glyph((s.icons or [])[loop.index0] if s.icons else icon_for(it) or 'check') }}</span><span>{{ it }}</span><span class="tick {{ 'tick--light' if dark else '' }} tk" id="{{ id }}-k{{ loop.index0 }}"></span></div>
+        {%- endfor %}
+      </div>
+    </div>
+    <div id="{{ id }}-flash"></div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+{{ lib.entry_js(s.entry or 'zoom-blur', id ~ '-cam', id ~ '-flash') }}
+      {%- if has_plain(s.heading or 'What you [need]') %}
+      tl.fromTo("#{{ id }}-h .w:not(.acc)", { opacity: 0, filter: "blur(10px)" }, { opacity: 1, filter: "blur(0px)", duration: 0.16, stagger: 0.07, ease: "power2.out" }, 0.08);
+      {%- endif %}
+      tl.fromTo("#{{ id }}-h .acc", { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.32, ease: "back.out(2.4)" }, 0.24);
+      {{- cue('pop', s.start + 0.28, 0.55) }}
+      {%- set span = [d - 1.2, 0.5]|max %}
+      {%- for it in s['items'] %}
+      {%- set ti = (s.times or [])[loop.index0] if (s.times and (s.times[loop.index0] is not none)) else (0.45 + span * loop.index0 / n) %}
+      {%- set ti = [[ti, 0.4 + loop.index0 * 0.18]|max, d - 0.6]|min %}
+      tl.fromTo("#{{ id }}-i{{ loop.index0 }}", { opacity: 0, x: {{ (-60*u)|round }}, scale: 0.92 }, { opacity: 1, x: 0, scale: 1, duration: 0.3, ease: "back.out(1.6)" }, {{ ti }});
+      tl.fromTo("#{{ id }}-k{{ loop.index0 }}", { scale: 0 }, { scale: 1, duration: 0.3, ease: "back.out(2.6)" }, {{ ti + 0.12 }});
+      {{- cue('click-soft', s.start + ti + 0.04, 0.5) }}{{ cue('pop-hi', s.start + ti + 0.15, 0.45) }}
+      {%- endfor %}
+      tl.fromTo("#{{ id }}-cam", { scale: 1 }, { scale: 1.04, duration: {{ d - (1.45 if s.entry == 'flash' else 0.6) - 0.02 }}, ease: "none", immediateRender: false }, {{ 1.25 if s.entry == 'flash' else 0.4 }});
+{{ lib.exit_js(s.exit or 'zoom', id ~ '-cam', id ~ '-flash', d) }}
+      window.__timelines["{{ id }}"] = tl;
+    })();
+  </script>
+</template>

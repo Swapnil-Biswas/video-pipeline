@@ -1,0 +1,236 @@
+[
+{
+"text": "Your",
+"start": 0.11,
+"end": 0.258,
+"line": "hook"
+},
+{
+"text": "AI",
+"start": 0.295,
+"end": 0.518,
+"line": "hook"
+},
+{
+"text": "agent",
+"start": 0.592,
+"end": 0.814,
+"line": "hook"
+},
+{
+"text": "says",
+"start": 0.889,
+"end": 1.037,
+"line": "hook"
+},
+{
+"text": "it's",
+"start": 1.074,
+"end": 1.223,
+"line": "hook"
+},
+{
+"text": "done.",
+"start": 1.26,
+"end": 1.78,
+"line": "hook"
+},
+{
+"text": "It",
+"start": 2.25,
+"end": 2.361,
+"line": "hook"
+},
+{
+"text": "isn't.",
+"start": 2.398,
+"end": 2.711,
+"line": "hook"
+},
+{
+"text": "Meet",
+"start": 3.081,
+"end": 3.266,
+"line": "reveal"
+},
+{
+"text": "HireCrew.",
+"start": 3.304,
+"end": 3.864,
+"line": "reveal"
+},
+{
+"text": "Order",
+"start": 4.092,
+"end": 4.315,
+"line": "loop"
+},
+{
+"text": "in",
+"start": 4.389,
+"end": 4.5,
+"line": "loop"
+},
+{
+"text": "plain",
+"start": 4.538,
+"end": 4.797,
+"line": "loop"
+},
+{
+"text": "words.",
+"start": 4.871,
+"end": 5.261,
+"line": "loop"
+},
+{
+"text": "Payment's",
+"start": 5.464,
+"end": 5.836,
+"line": "loop"
+},
+{
+"text": "held.",
+"start": 5.873,
+"end": 6.151,
+"line": "loop"
+},
+{
+"text": "Code",
+"start": 6.318,
+"end": 6.541,
+"line": "loop"
+},
+{
+"text": "checks",
+"start": 6.578,
+"end": 6.838,
+"line": "loop"
+},
+{
+"text": "every",
+"start": 6.911,
+"end": 7.209,
+"line": "loop"
+},
+{
+"text": "step.",
+"start": 7.357,
+"end": 7.728,
+"line": "loop"
+},
+{
+"text": "You",
+"start": 7.877,
+"end": 7.988,
+"line": "loop"
+},
+{
+"text": "verify",
+"start": 8.024,
+"end": 8.247,
+"line": "loop"
+},
+{
+"text": "it,",
+"start": 8.47,
+"end": 8.637,
+"line": "loop"
+},
+{
+"text": "then",
+"start": 8.73,
+"end": 8.841,
+"line": "loop"
+},
+{
+"text": "pay.",
+"start": 8.915,
+"end": 9.148,
+"line": "loop"
+},
+{
+"text": "Or",
+"start": 9.458,
+"end": 9.606,
+"line": "crew"
+},
+{
+"text": "hire",
+"start": 9.717,
+"end": 9.94,
+"line": "crew"
+},
+{
+"text": "a",
+"start": 10.014,
+"end": 10.051,
+"line": "crew"
+},
+{
+"text": "whole",
+"start": 10.088,
+"end": 10.2,
+"line": "crew"
+},
+{
+"text": "crew,",
+"start": 10.237,
+"end": 10.607,
+"line": "crew"
+},
+{
+"text": "under",
+"start": 10.756,
+"end": 10.941,
+"line": "crew"
+},
+{
+"text": "a",
+"start": 11.053,
+"end": 11.164,
+"line": "crew"
+},
+{
+"text": "hard",
+"start": 11.201,
+"end": 11.313,
+"line": "crew"
+},
+{
+"text": "cap.",
+"start": 11.461,
+"end": 11.807,
+"line": "crew"
+},
+{
+"text": "Pay",
+"start": 12.117,
+"end": 12.34,
+"line": "end"
+},
+{
+"text": "only",
+"start": 12.414,
+"end": 12.599,
+"line": "end"
+},
+{
+"text": "for",
+"start": 12.785,
+"end": 12.896,
+"line": "end"
+},
+{
+"text": "finished",
+"start": 12.933,
+"end": 13.193,
+"line": "end"
+},
+{
+"text": "work.",
+"start": 13.342,
+"end": 13.898,
+"line": "end"
+}
+]

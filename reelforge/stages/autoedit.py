@@ -1,0 +1,403 @@
+"""Stage · autoedit: an editor's first cut of a talking-head video, planned from the transcript.
+
+When project `scenes: auto` and `aroll.video` is set, this writes build/<name>/autoedit/plan.json:
+  - silence trimmed: pauses longer than autoedit.min_gap are removed (padding kept around speech)
+  - jump cuts at word boundaries, shots between min_shot and max_shot, alternating punch-in framing
+  - motivated transitions: hard cuts, a zoom punch every few cuts, a flash/whip on new sentences and cutaways
+  - motion-graphics representations of what is said:
+      list cutaways   ("a good camera, a good mic, good lighting, a good setup" -> full-screen checklist)
+      stat overlays   ("100%" -> counter card over the speaker)
+      keyword pop-ups with clay icon stickers (phone, camera, money, viral, goal ...)
+  - a hook title over the first shot, an optional outro, and a lower-third name tag
+  - the dialogue track as one audio range per kept span, so speech is continuous under cutaways
+Everything is plain data; compose renders it with the scene templates. Review it at the preview checkpoint."""
+from __future__ import annotations
+
+import re
+
+from pathlib import Path
+
+from ..util import PipelineError, log, read_json, write_json
+
+STOP = set("""a an the and or but so to of in on at for with by from as is are was were be been being am i you he she it we they
+me my your our their his her its this that these those there here then than too very just also not no yes do does did done
+have has had will would can could should may might must shall if when while because about into over under up down out
+more most much many lot lots some any all each every such own same other only even still again ever never always people
+thing things one get got go goes going make makes made like want need say said know think really actually okay ok yeah
+let us them what which who whom whose how why where today it's that's don't you're i'm i've there's what's can't
+etc""".split())
+
+ICONS = {  # keyword (lowercase, prefix match) -> glyph name in _lib.j2
+    "phone": "phone", "mobile": "phone", "camera": "camera", "video": "play", "mic": "mic", "microphone": "mic",
+    "light": "bulb", "lighting": "bulb", "setup": "grid", "money": "coin", "income": "coin", "paid": "coin", "pay": "coin",
+    "cost": "coin", "campaign": "chart", "viral": "bolt", "following": "users", "followers": "users", "influencer": "users",
+    "creator": "star", "content": "play", "quality": "star", "goal": "target", "journey": "steps", "step": "steps",
+    "comment": "chat", "equipment": "camera", "professional": "check", "sustainable": "chart", "easy": "check",
+    "brand": "star", "growth": "chart", "time": "clock", "audience": "users", "subscribe": "bolt", "start": "play",
+}
+
+
+def icon_for(word: str) -> str | None:
+    w = re.sub(r"[^a-z]", "", word.lower())
+    for k, g in ICONS.items():
+        if w.startswith(k):
+            return g
+    return None
+
+
+def clean(w: str) -> str:
+    return re.sub(r"[^\w%$'-]", "", w)
+
+
+def score_word(w: str) -> float:
+    c = clean(w).lower()
+    if not c or c in STOP or len(c) < 3:
+        return 0.0
+    return len(c) * 0.25 + (3.0 if icon_for(c) else 0.0) + (2.5 if re.search(r"\d", c) else 0.0)
+
+
+# ---------------------------------------------------------------- spans and shots
+def speech_spans(words, min_gap, pad, dur):
+    spans = []
+    for w in words:
+        if spans and w["start"] - spans[-1][1] < min_gap:
+            spans[-1][1] = max(spans[-1][1], w["end"])
+        else:
+            spans.append([w["start"], w["end"]])
+    out = []
+    for a, b in spans:
+        a, b = max(0.0, a - pad), min(dur, b + pad)
+        if out and a <= out[-1][1]:
+            out[-1][1] = b
+        else:
+            out.append([a, b])
+    return out
+
+
+def split_span(a, b, words, min_shot, max_shot):
+    """Split [a, b] into shots no longer than max_shot, cutting in the widest gap between words."""
+    if b - a <= max_shot:
+        return [(a, b)]
+    inner = [w for w in words if a < w["start"] < b]
+    cands = []
+    for w0, w1 in zip(inner, inner[1:]):
+        t = (w0["end"] + w1["start"]) / 2
+        if t - a >= min_shot and b - t >= min_shot:
+            cands.append((w1["start"] - w0["end"], -abs(t - (a + b) / 2), t))
+    if not cands:
+        return [(a, b)]
+    # prefer cuts that land near max_shot from the start, among the wider gaps
+    target = a + min(max_shot, (b - a) / 2 + 0.5)
+    best = max(cands, key=lambda c: c[0] * 3 - abs(c[2] - target) * 0.6)
+    return split_span(a, best[2], words, min_shot, max_shot) + split_span(best[2], b, words, min_shot, max_shot)
+
+
+# ---------------------------------------------------------------- representations
+def find_list(text: str):
+    """'... a good camera, a good mic, good lighting, a good setup, etc.' -> ['Good camera', ...]"""
+    parts = [x.strip() for x in re.split(r",|\band\b", text) if x.strip()]
+    items, run = [], []
+    for x in parts:
+        x = re.split(r"[.!?]\s+", x)[-1]              # keep only the clause that leads into the item
+        x2 = re.sub(r"^((you|we|i)\s+)?(need|needs|should have|must have|have|get|buy)\s+", "", x, flags=re.I)
+        x2 = re.sub(r"^(a|an|the|and)\s+", "", x2, flags=re.I).strip(" .")
+        x2 = re.sub(r"\b(etc|etc\.)\b.*$", "", x2, flags=re.I).strip(" .")
+        if 1 <= len(x2.split()) <= 3 and len(x2) <= 22 and x2:
+            run.append(x2)
+        else:
+            if len(run) >= 3:
+                items = run
+                break
+            run = []
+    if len(run) >= 3 and not items:
+        items = run
+    return [i[0].upper() + i[1:] for i in items[:5]] if len(items) >= 3 else None
+
+
+def map_time(t, ranges):
+    """source time -> film time, or None if t was trimmed away"""
+    for r in ranges:
+        if r["src"] - 1e-6 <= t <= r["src"] + r["dur"] + 1e-6:
+            return r["film"] + (t - r["src"])
+    return None
+
+
+def run_stage(p) -> dict:
+    if p.cfg.get("scenes") != "auto":
+        return {"plan": None}
+    a = p.cfg.get("aroll") or {}
+    man = read_json(p.build / "ingest" / "manifest.json", {})
+    tr = read_json(p.build / "transcribe" / "transcript.json") if a.get("video") else None
+    ae0 = p.cfg["autoedit"]
+    if ae0.get("mode") == "montage" or not a.get("video") or not tr or len(tr.get("words", [])) < ae0.get("min_words_for_talk", 8):
+        return plan_montage(p, man)
+    foot = next(f for f in man["footage"] if f["id"] == a["video"])
+    dur = float(foot["probe"]["format"]["duration"])
+    ae = p.cfg["autoedit"]
+    words = tr["words"]
+    # 1. keep speech, drop long pauses
+    spans = speech_spans(words, ae["min_gap"], ae["pad"], dur) if ae["trim_silence"] else [[0.0, dur]]
+    # 2. shots
+    shots = []
+    for s0, s1 in spans:
+        shots += split_span(s0, s1, words, ae["min_shot"], ae["max_shot"])
+    # the hook title needs time to be read: merge the opening shots until the first one is long enough
+    while ae.get("hook", True) and len(shots) > 1 and shots[0][1] - shots[0][0] < ae.get("hook_min_s", 2.6)             and abs(shots[1][0] - shots[0][1]) < 1e-6:
+        shots[0:2] = [(shots[0][0], shots[1][1])]
+    ranges, t = [], 0.0
+    for s0, s1 in shots:
+        ranges.append({"film": round(t, 3), "src": round(s0, 3), "dur": round(s1 - s0, 3)})
+        t += s1 - s0
+    talk_end = round(t, 3)
+    removed = dur - talk_end
+    # 3. caption words in film time
+    film_words = []
+    for w in tr["caption_words"]:
+        fs, fe = map_time(w["start"], ranges), map_time(w["end"], ranges)
+        if fs is None and fe is None:
+            continue
+        fs = fs if fs is not None else fe - 0.15
+        fe = fe if fe is not None else fs + 0.15
+        film_words.append({**w, "start": round(fs, 3), "end": round(max(fe, fs + 0.08), 3)})
+    phrases = []
+    for i, ph in enumerate(tr["phrases"]):
+        ws = [w for w in film_words if w.get("phrase") == i]
+        if ws:
+            phrases.append({"i": i, "text": ph["text"], "start": ws[0]["start"], "end": ws[-1]["end"], "words": ws})
+
+    # 4. representations
+    cutaways = []          # (film_start, film_end, scene dict)
+    if ae["cutaways"]:
+        for ph in phrases:
+            items = find_list(ph["text"])
+            if not items:
+                continue
+            # time each item at its first word
+            times = []
+            for it in items:
+                key = clean(it.split()[-1]).lower()
+                hit = next((w for w in ph["words"] if clean(w["text"]).lower().startswith(key[:4])), None)
+                times.append(hit["start"] if hit else None)
+            t0 = min(x for x in times if x is not None) - 0.25 if any(times) else ph["start"]
+            t1 = max(x for x in times if x is not None) + 1.4 if any(times) else ph["end"]
+            cutaways.append([t0, t1, {"type": "list", "items": items, "times": times,
+                                      "heading": ae.get("list_heading") or "What you [need]"}])
+    # 5. assemble scenes: footage shots, cutaways replace the shots they cover (snapped to shot edges)
+    scenes, overlays_used, last_overlay = [], [], -99.0
+    hook_end = ranges[0]["dur"] if ranges else 0
+    cut_spans = []
+    for c0, c1, sc in cutaways:
+        i0 = max([i for i, r in enumerate(ranges) if r["film"] <= c0] or [0])
+        i1 = min([i for i, r in enumerate(ranges) if r["film"] + r["dur"] >= c1] or [len(ranges) - 1])
+        if i0 == 0:
+            i0 = 1                                      # never cut away from the hook shot
+        if i1 < i0:
+            continue
+        cut_spans.append((i0, i1, sc))
+    overlay_top = safe_zones(Path(foot["path"]), ae["punch"])["overlay_top"]
+    k, n_cut, scene_i = 0, 0, 0
+    first_sentence = re.split(r"(?<=[.!?])\s", phrases[0]["text"])[0] if phrases else ""
+    while k < len(ranges):
+        cs = next((c for c in cut_spans if c[0] == k), None)
+        if cs:
+            i0, i1, sc = cs
+            f0 = ranges[i0]["film"]
+            f1 = ranges[i1]["film"] + ranges[i1]["dur"]
+            d = round(f1 - f0, 3)
+            times = [round(x - f0, 3) if x is not None else None for x in sc["times"]]
+            scenes.append({"id": f"cut{scene_i}", "type": "list", "duration": d, "world": graphic_world(p, n_cut),
+                           "heading": sc["heading"], "items": sc["items"], "times": times,
+                           "entry": pick_transition(ae, k, True, into_graphic=True), "exit": "zoom"})
+            k = i1 + 1
+            n_cut += 1
+            scene_i += 1
+            continue
+        r = ranges[k]
+        f0, f1 = r["film"], r["film"] + r["dur"]
+        punch = ae["punch"]
+        push = [1.0, 1.035] if k % 2 == 0 else [punch, punch + 0.035]
+        prev_is_cut = bool(scenes) and scenes[-1]["type"] == "list"
+        ph_start = next((ph for ph in phrases if abs(ph["start"] - f0) < 0.35), None)
+        motivated = bool(ph_start and re.match(r"^(but|so|and if|now|that's why)\b", ph_start["text"], re.I))
+        entry = "none" if k == 0 else pick_transition(ae, k, motivated, after_graphic=prev_is_cut)
+        sc = {"id": f"shot{scene_i}", "type": "footage", "video": a["video"], "media_start": r["src"], "duration": r["dur"],
+              "push": push, "entry": entry, "exit": "none", "overlays": [], "overlay_top": overlay_top}
+        if k == 0 and ae.get("hook", True):
+            hook = ae.get("hook_text") or hook_from(first_sentence)
+            sc["caption_pos"] = "middle"
+            sc["lines"] = [{"text": l, "size": sz} for l, sz in hook]
+        else:
+            # overlays: stat or keyword pop-up, spaced out
+            ws = [w for w in film_words if f0 + 0.3 <= w["start"] <= f1 - 1.0]
+            stat = next((w for w in ws if re.search(r"\d+%|\$\d+|\d{2,}", w["text"])), None)
+            if stat and f0 - last_overlay > 2.5:
+                num = re.search(r"\d+", stat["text"]).group(0)
+                sc["overlays"].append({"type": "stat", "at": round(stat["start"] - f0, 3), "value": int(num),
+                                       "suffix": "%" if "%" in stat["text"] else "", "label": stat_label(stat, film_words)})
+                last_overlay = stat["start"]
+            elif ws and stat is None:
+                best = max(ws, key=lambda w: score_word(w["text"]))
+                if score_word(best["text"]) >= ae["keyword_min_score"] and best["start"] - last_overlay > ae["keyword_spacing"]:
+                    word = clean(best["text"])
+                    sc["overlays"].append({"type": "keyword", "at": round(best["start"] - f0, 3), "text": word.upper(),
+                                           "icon": icon_for(word), "side": "left" if len(overlays_used) % 2 else "right"})
+                    overlays_used.append(word)
+                    last_overlay = best["start"]
+        if k == 1 and a.get("name"):
+            sc["overlays"].append({"type": "lowerthird", "at": 0.2, "text": a["name"]})
+        scenes.append(sc)
+        k += 1
+        scene_i += 1
+    out_cfg = ae.get("outro")
+    if out_cfg:
+        scenes.append({"id": "outro", "type": out_cfg.get("type", "kinetic"), "duration": out_cfg.get("duration", 2.6),
+                       "world": out_cfg.get("world", "dark"), "entry": out_cfg.get("entry", "whip-left"), "exit": "none",
+                       **{k2: v for k2, v in out_cfg.items() if k2 not in ("type", "duration", "world", "entry")}})
+    hook_cut = ranges[0]["dur"] if ae.get("hook", True) and ranges else 0
+    cap_words = [w for w in film_words if w["start"] >= hook_cut - 0.05]
+    plan = {"safe": safe_zones(Path(foot["path"]), ae["punch"]), "scenes": scenes, "film_words": cap_words, "all_film_words": film_words, "aroll_ranges": ranges,
+            "talk_end": talk_end, "removed_s": round(removed, 3), "source_duration": dur}
+    write_json(p.build / "autoedit" / "plan.json", plan)
+    n_ov = sum(len(s.get("overlays", [])) for s in scenes)
+    log.info("  %.1fs of speech kept from %.1fs (%.1fs of pauses cut), %d shots, %d cutaways, %d overlays%s",
+             talk_end, dur, removed, sum(1 for s in scenes if s["type"] == "footage"), n_cut, n_ov,
+             ", outro" if out_cfg else "")
+    for s in scenes:
+        extra = s.get("entry", "")
+        if s["type"] == "list":
+            extra += f" LIST {s['items']}"
+        for o in s.get("overlays", []):
+            extra += f" [{o['type']}: {o.get('text') or o.get('value')}{' +' + o['icon'] if o.get('icon') else ''}]"
+        if s.get("lines"):
+            extra += " HOOK " + " / ".join(l["text"] for l in s["lines"])
+        log.info("    %-7s %-8s %5.2fs  %s", s["id"], s["type"], s["duration"], extra)
+    return {"plan": str(p.build / "autoedit" / "plan.json"), "scenes": len(scenes), "talk_end": talk_end}
+
+
+def safe_zones(video, punch: float) -> dict:
+    """Where captions and graphics may go without covering the speaker's face (punch-ins included)."""
+    from ..vision import face_box
+    fb = face_box(video)
+    if not fb:
+        return {"face": None, "caption_y_min": 0.0, "overlay_top": 0.12}
+    oy = 0.32                                            # footage push/punch origin (footage template: 50% 32%)
+    bottom = oy + (fb["bottom"] - oy) * (punch + 0.04)
+    top = oy - (oy - fb["top"]) * (punch + 0.04)
+    return {"face": fb, "caption_y_min": round(min(0.86, bottom + 0.03), 3),
+            "overlay_top": round(max(0.05, min(0.12, top - 0.11)), 3)}
+
+
+def graphic_world(p, n: int) -> str:
+    """Full-screen graphics use the world the reference lives in (light paper vs dark), alternating if it is mixed."""
+    st = read_json(p.build / "style" / "style.json") or {}
+    pal = ((st.get("measured") or {}).get("palette")) or []
+    light = sum(c["share"] for c in pal if c["L"] > 75)
+    dark = sum(c["share"] for c in pal if c["L"] < 30)
+    if pal and light > dark * 1.5:
+        return "light"
+    if pal and dark > light * 1.5:
+        return "dark"
+    return "dark" if n % 2 == 0 else "light"
+
+
+def pick_transition(ae: dict, k: int, motivated: bool, after_graphic: bool = False, into_graphic: bool = False) -> str:
+    """Transitions drawn from the reference's measured mix (style stage) or the house defaults.
+    Deterministic: the same plan always gets the same transitions."""
+    w = {"cut": 0.55, "flash": 0.15, "zoom-blur": 0.15, "punch": 0.2, **(ae.get("transition_weights") or {})}
+    if into_graphic or after_graphic:
+        return "zoom-blur" if w["zoom-blur"] >= 0.04 else "flash" if w["flash"] >= 0.04 else "whip-left"
+    if motivated:
+        if w["flash"] >= 0.06:
+            return "flash"
+        return "zoom-blur" if w["zoom-blur"] >= 0.06 else "punch"
+    if w["flash"] > 0.3 and k % 2 == 1:
+        return "flash"
+    if w["zoom-blur"] > 0.3 and k % 3 == 1:
+        return "zoom-blur"
+    if k % int(ae.get("punch_every", 3)) == 0 and w["punch"] >= 0.05:
+        return "punch"
+    return "cut"
+
+
+def plan_montage(p, man) -> dict:
+    """No speech to follow: cut the footage on the music's beat grid at the reference's shot lengths."""
+    ae = p.cfg["autoedit"]
+    clips = [f for f in man.get("footage", [])]
+    if not clips:
+        raise PipelineError("scenes: auto needs footage")
+    bpm = float((p.cfg["music"].get("arrange") or {}).get("bpm") or 120)
+    beat = 60.0 / bpm
+    style = read_json(p.build / "style" / "style.json") or {}
+    shots_ref = [s for s in ((style.get("measured") or {}).get("pacing") or {}).get("shots", []) if 0.3 <= s <= 8] or                 [ae["max_shot"], ae["min_shot"], (ae["min_shot"] + ae["max_shot"]) / 2]
+    limit = float(ae.get("max_duration") or 30.0)
+    scenes, t, k, ri = [], 0.0, 0, 0
+    for c in clips:
+        cdur = float(c["probe"]["format"]["duration"])
+        pos = min(0.2, cdur * 0.05)
+        while pos < cdur - 0.4 and t < limit:
+            want = shots_ref[ri % len(shots_ref)]
+            ri += 1
+            d = max(beat, round(want / beat) * beat)          # snap to whole beats
+            d = min(d, cdur - pos, limit - t)
+            if d < 0.4:
+                break
+            punch = ae["punch"]
+            push = [1.0, 1.05] if k % 2 == 0 else [punch, punch + 0.04]
+            sc = {"id": f"shot{k}", "type": "footage", "video": c["id"], "media_start": round(pos, 3), "duration": round(d, 3),
+                  "push": push, "entry": "none" if k == 0 else pick_transition(ae, k, k % 4 == 0), "exit": "none",
+                  "overlays": [], "audio": bool(ae.get("keep_footage_audio"))}
+            if k == 0 and ae.get("hook_text"):
+                sc["caption_pos"] = "middle"
+                sc["lines"] = [{"text": l, "size": sz} for l, sz in ae["hook_text"]]
+            scenes.append(sc)
+            t += d
+            pos += d
+            k += 1
+        if t >= limit:
+            break
+    out_cfg = ae.get("outro")
+    if out_cfg:
+        scenes.append({"id": "outro", "type": out_cfg.get("type", "kinetic"), "duration": out_cfg.get("duration", 2.6),
+                       "world": out_cfg.get("world", "dark"), "entry": out_cfg.get("entry", "whip-left"), "exit": "none",
+                       **{k2: v for k2, v in out_cfg.items() if k2 not in ("type", "duration", "world", "entry")}})
+    plan = {"mode": "montage", "scenes": scenes, "film_words": [], "all_film_words": [], "aroll_ranges": [], "talk_end": round(t, 3),
+            "removed_s": 0, "source_duration": sum(float(c["probe"]["format"]["duration"]) for c in clips)}
+    write_json(p.build / "autoedit" / "plan.json", plan)
+    log.info("  montage: %d shots on a %.0f BPM grid, %.1fs%s", k, bpm, t, ", outro" if out_cfg else "")
+    for s in scenes:
+        log.info("    %-7s %-8s %5.2fs  %s", s["id"], s["type"], s["duration"], s.get("entry", ""))
+    return {"plan": str(p.build / "autoedit" / "plan.json"), "scenes": len(scenes), "talk_end": round(t, 3)}
+
+
+def hook_from(sentence: str):
+    """Hook title from the first sentence: the strongest 1-2 word phrase becomes the accent pill."""
+    toks = sentence.strip().rstrip(".!?").split()
+    if not toks:
+        return []
+    best_i = max(range(len(toks)), key=lambda i: score_word(toks[i]) + (score_word(toks[i + 1]) * 0.8 if i + 1 < len(toks) else 0))
+    j = best_i + 1 if best_i + 1 < len(toks) and score_word(toks[best_i + 1]) > 0 else best_i
+    head = " ".join(toks[:best_i])
+    acc = " ".join(toks[best_i:j + 1])
+    tail = " ".join(toks[j + 1:])
+    lines = []
+    if head:
+        lines.append((head, 64))
+    lines.append((f"[{acc}]" + (f" {tail}" if tail and len(tail) < 14 else ""), 96))
+    if tail and len(tail) >= 14:
+        lines.append((tail, 56))
+    return lines
+
+
+def stat_label(stat, words):
+    """The word(s) right after the number, up to the end of the clause: '100% true. But' -> 'TRUE'."""
+    i = words.index(stat)
+    out = []
+    if re.search(r"[.!?,]$", stat["text"]):
+        return ""
+    for w in words[i + 1:i + 4]:
+        c = clean(w["text"])
+        if c.lower() not in STOP:
+            out.append(c)
+        if re.search(r"[.!?,]$", w["text"]) or len(out) == 2:
+            break
+    return " ".join(out).upper()[:16]

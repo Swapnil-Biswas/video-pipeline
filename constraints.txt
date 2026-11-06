@@ -1,0 +1,4 @@
+# Keep the CUDA build of PyTorch: easyocr's dependency resolution otherwise replaces it with a CPU-only torch.
+torch==2.11.0
+torchvision==0.26.0
+torchaudio==2.11.0

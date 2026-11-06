@@ -1,0 +1,80 @@
+{#- Film-wide overlay track: word-synced captions and an optional progress bar.
+    P: phrases [{id, start, end, words:[{text,start,end}]}]   C: captions config   T: theme   PROG: film length or 0
+    C.style (modelled on the HyperFrames registry caption components):
+      pill      bold 2-3 word groups, the spoken word lit in a pill (caption-pill-karaoke)   ('reel' = pill)
+      highlight the spoken word gets an accent block behind it (caption-highlight)
+      color     the spoken word turns accent colour, no boxes
+      slam      one big word at a time, centre screen (caption-kinetic-slam)
+      clean     plain bold line with a soft shadow, no highlight
+      subtle    small boxed line (original film 1)
+    C.upper: uppercase   C.box: soft dark backing behind the group   C.reel_y: vertical position (fraction) -#}
+{%- set st = 'pill' if (C.style or 'pill') == 'reel' else (C.style or 'pill') -%}
+{%- set shadow = T.cap_shadow or "0 0 2px rgba(0,0,0,.9), 0 3px 0 rgba(0,0,0,.55), 0 8px 26px rgba(0,0,0,.55)" -%}
+{%- set noshadow = "0 0 0 rgba(0,0,0,0), 0 0 0 rgba(0,0,0,0), 0 0 0 rgba(0,0,0,0)" -%}
+{%- set hlbg = T.cap_hl_bg -%}
+{%- set box = C.box if C.box is not none and C.box is defined else true -%}
+<template>
+  <style>
+    #captions-root { position: absolute; inset: 0; pointer-events: none; }
+    #captions-root .ph { position: absolute; left: 0; right: 0; display: flex; justify-content: center; opacity: 0;
+      {% if st == 'subtle' %}bottom: {{ (C.bottom*u)|round }}px;{% elif st == 'slam' %}top: {{ (H*C.reel_y)|round }}px;{% else %}top: {{ (H*C.reel_y)|round }}px;{% endif %} }
+    {%- if st == 'subtle' %}
+    #captions-root .ph .box { max-width: {{ (W*0.86)|round }}px; text-align: center; padding: {{ (8*u)|round }}px {{ (18*u)|round }}px; border-radius: {{ (14*u)|round }}px;
+      background: rgba(10,10,11,.62); color: {{ T.on_dark }}; font-family: {{ T.font_body }}; font-size: {{ (C.size*u)|round }}px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.25; }
+    #captions-root .ph .cw { opacity: .55; }
+    {%- else %}
+    #captions-root .ph .box { max-width: {{ (W*0.86)|round }}px; text-align: center; font-family: {{ T.font_display }};
+      font-size: {{ ((C.reel_size * (1.9 if st == 'slam' else 1.0))*u)|round }}px; font-weight: {{ T.display_weight if T.display_weight > 600 else 700 }}; letter-spacing: -0.02em; line-height: 1.16; color: {{ T.cap_fg }};
+      {% if C.upper %}text-transform: uppercase;{% endif %} text-shadow: {{ shadow }};
+      {% if box %}padding: 0.1em 0.3em 0.14em; border-radius: 0.4em; background: {{ T.cap_box }};{% endif %} }
+    #captions-root .ph .cw { display: inline-block; padding: 0.02em 0.16em 0.06em; margin: 0 0.02em; border-radius: 0.28em; }
+    {%- endif %}
+    #captions-prog { position: absolute; left: 0; top: 0; height: {{ ([6*u, 4]|max)|round }}px; width: 100%; background: {{ T.cap_hl_bg }}; transform-origin: 0 50%; transform: scaleX(0); box-shadow: 0 0 10px rgba(0,0,0,.35); }
+  </style>
+  <div id="captions-root" data-composition-id="captions" data-width="{{ W }}" data-height="{{ H }}" data-layout-allow-overlap>
+    {%- if PROG %}<div id="captions-prog" data-layout-ignore></div>{% endif %}
+    {%- for p in P %}
+    {%- set chars = (p.words|map(attribute='text')|join(' '))|length %}
+    {%- set fit = ((W*0.70) / ([chars, 1]|max * 0.66 * C.reel_size * 1.9 * u)) if st == 'slam' else 1 %}
+    <div class="ph" id="{{ p.id }}"><span class="box"{% if fit < 1 %} style="font-size:{{ (C.reel_size * 1.9 * u * fit)|round }}px"{% endif %}>{% for w in p.words %}<span class="cw" id="{{ p.id }}-w{{ loop.index0 }}">{{ w.text }}</span>{% if not loop.last %} {% endif %}{% endfor %}</span></div>
+    {%- endfor %}
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+      {%- if PROG %}
+      tl.fromTo("#captions-prog", { scaleX: 0 }, { scaleX: 1, duration: {{ PROG }}, ease: "none" }, 0);
+      {%- endif %}
+      {%- for p in P %}
+      {%- if st == 'subtle' %}
+      tl.fromTo("#{{ p.id }}", { opacity: 0, y: {{ (8*u)|round }} }, { opacity: 1, y: 0, duration: 0.12, ease: "power2.out" }, {{ p.start }});
+      {%- for w in p.words %}
+      tl.fromTo("#{{ p.id }}-w{{ loop.index0 }}", { opacity: 0.55 }, { opacity: 1, duration: 0.06 }, {{ w.start }});
+      {%- endfor %}
+      {%- elif st == 'slam' %}
+      tl.fromTo("#{{ p.id }}", { opacity: 0, scale: 1.5, y: {{ (30*u)|round }} }, { opacity: 1, scale: 1, y: 0, duration: {{ [0.12, (p.end - p.start) * 0.4]|min|round(3) }}, ease: "power4.out" }, {{ p.start }});
+      {%- else %}
+      tl.fromTo("#{{ p.id }}", { opacity: 0, scale: 0.86, y: {{ (14*u)|round }} }, { opacity: 1, scale: 1, y: 0, duration: {{ [0.14, (p.end - p.start) * 0.4]|min|round(3) }}, ease: "back.out(2)" }, {{ p.start }});
+      {%- if st in ['pill', 'highlight', 'color'] %}
+      {%- for w in p.words %}
+      {%- if st == 'color' %}
+      tl.fromTo("#{{ p.id }}-w{{ loop.index0 }}", { color: "{{ T.cap_fg }}" }, { color: "{{ hlbg }}", duration: 0.05 }, {{ w.start }});
+      {%- if not loop.last %}
+      tl.to("#{{ p.id }}-w{{ loop.index0 }}", { color: "{{ T.cap_fg }}", duration: 0.05 }, {{ p.words[loop.index0 + 1].start }});
+      {%- endif %}
+      {%- else %}
+      tl.fromTo("#{{ p.id }}-w{{ loop.index0 }}", { backgroundColor: "{{ hlbg }}00", color: "{{ T.cap_fg }}", textShadow: "{{ shadow }}" },
+        { backgroundColor: "{{ hlbg }}ff", color: "{{ T.cap_hl_fg }}", textShadow: "{{ noshadow }}", duration: 0.05 }, {{ w.start }});
+      {%- if not loop.last %}
+      tl.to("#{{ p.id }}-w{{ loop.index0 }}", { backgroundColor: "{{ hlbg }}00", color: "{{ T.cap_fg }}", textShadow: "{{ shadow }}", duration: 0.05 }, {{ p.words[loop.index0 + 1].start }});
+      {%- endif %}
+      {%- endif %}
+      {%- endfor %}
+      {%- endif %}
+      {%- endif %}
+      tl.to("#{{ p.id }}", { opacity: 0, duration: {{ [0.04, (p.end - p.start) * 0.2]|min|round(3) }} }, {{ p.end }});
+      {%- endfor %}
+      window.__timelines["captions"] = tl;
+    })();
+  </script>
+</template>

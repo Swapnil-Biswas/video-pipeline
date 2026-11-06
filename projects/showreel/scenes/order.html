@@ -1,0 +1,52 @@
+<template>
+  <style>
+    #root { position: absolute; inset: 0; overflow: hidden; }
+    #od-cam { position: absolute; inset: 0; transform-origin: 1446px 636px; }
+    #od-greet { position: absolute; left: 0; right: 0; top: 330px; display: flex; justify-content: center; align-items: center; gap: 24px; font-size: 66px; font-weight: 600; letter-spacing: -0.03em; color: #ececee; }
+    #od-greet img { width: 104px; height: 104px; border-radius: 28px; box-shadow: 0 0 0 2px rgba(255,255,255,.2), 0 18px 30px -12px rgba(0,0,0,.9); }
+    #od-box { position: absolute; left: 400px; top: 480px; width: 1120px; height: 220px; border-radius: 40px; padding: 30px 36px; background: #232326;
+      box-shadow: 0 40px 70px -30px rgba(0,0,0,.9), inset 5px 5px 12px rgba(255,255,255,.06), inset -8px -8px 16px rgba(0,0,0,.5); }
+    #od-text { font-size: 40px; font-weight: 600; color: #ececee; white-space: nowrap; }
+    #od-ph { position: absolute; left: 36px; top: 34px; font-size: 40px; font-weight: 600; color: #6a6a6e; }
+    #od-foot { position: absolute; left: 36px; right: 36px; bottom: 26px; display: flex; align-items: center; gap: 16px; }
+    #od-foot .chip { font-size: 28px; }
+    #od-send { margin-left: auto; width: 76px; height: 76px; border-radius: 50%; background: #f4f4f4; display: grid; place-items: center;
+      box-shadow: 0 12px 22px -10px rgba(0,0,0,.6), inset 4px 4px 8px #fff, inset -5px -5px 10px rgba(0,0,0,.18); }
+    #od-send svg { width: 34px; height: 34px; }
+    #od-flash { position: absolute; inset: 0; background: #f4f4f4; opacity: 0; }
+  </style>
+  <div id="root" data-composition-id="order" data-width="1920" data-height="1080" data-layout-allow-overlap>
+    <div class="world-dark"></div>
+    <div class="glow" style="left:560px;top:120px;width:800px;height:800px"></div>
+    <div id="od-cam" data-layout-allow-overflow>
+      <div id="od-greet"><img src="assets/brand/hirecrew-icon.png" alt="HireCrew" />What should your crew do?</div>
+      <div id="od-box">
+        <span id="od-ph">Describe a job…</span>
+        <span id="od-text">Every invoice email → a row in my Sheet</span>
+        <div id="od-foot"><span class="chip chip--dark">Inbox-to-Sheet</span><span class="chip chip--dark">$5.00 · pay on accept</span>
+          <span id="od-send"><svg viewBox="0 0 34 34"><path d="M17 28 V7 M8 15 L17 6 L26 15" fill="none" stroke="#151515" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" /></svg></span></div>
+      </div>
+    </div>
+    <svg id="od-cursor" class="cursor" viewBox="0 0 32 38" style="left:0;top:0"><path d="M3 2 L3 31 L10.5 24 L15.5 35 L20.5 32.8 L15.6 22 L26 22 Z" fill="#fff" stroke="#151515" stroke-width="2.4" stroke-linejoin="round"/></svg>
+    <div id="od-flash"></div>
+  </div>
+  <script>
+    (function () {
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo("#od-cam", { scale: 1.1, filter: "blur(14px)", opacity: 0 }, { scale: 1, filter: "blur(0px)", opacity: 1, duration: 0.35, ease: "expo.out" }, 0);
+      tl.fromTo("#od-greet", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.3, ease: "expo.out" }, 0.05);
+      // The brief types itself.
+      tl.fromTo("#od-ph", { opacity: 1 }, { opacity: 0, duration: 0.05 }, 0.28);
+      tl.fromTo("#od-text", { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration: 0.6, ease: "steps(38)" }, 0.3);
+      tl.fromTo("#od-foot .chip", { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.25, stagger: 0.1, ease: "back.out(2)" }, 0.85);
+      // Cursor clicks send; the camera dives into the button.
+      tl.fromTo("#od-cursor", { x: 1960, y: 1120 }, { x: 1440, y: 630, duration: 0.35, ease: "power3.out" }, 0.9);
+      tl.to("#od-cursor", { scale: 0.85, duration: 0.07, yoyo: true, repeat: 1 }, 1.28);
+      tl.to("#od-send", { scale: 0.88, duration: 0.07, yoyo: true, repeat: 1 }, 1.28);
+      tl.to("#od-cursor", { opacity: 0, duration: 0.1 }, 1.42);
+      tl.to("#od-cam", { scale: 26, duration: 0.36, ease: "power3.in" }, 1.44);
+      tl.to("#od-flash", { opacity: 1, duration: 0.08 }, 1.72);
+      window.__timelines["order"] = tl;
+    })();
+  </script>
+</template>
