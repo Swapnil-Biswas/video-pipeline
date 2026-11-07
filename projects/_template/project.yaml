@@ -39,7 +39,7 @@ scenes:
     type: endcard
     duration: 4.0
     type_text: "This is"
-    logo: assets/brand/hirecrew-logo-trim.png
+    # logo: assets/brand/your-logo.png    # optional: drop in your own brand logo
     tagline: "Your [tagline.]"
     cta: "Get started →"
 
@@ -50,5 +50,9 @@ music:
 
 voice: {mode: none}
 captions: {enabled: false}
+
+# Persistent @handle / logo watermark over every frame (optional).
+# brand:
+#   watermark: {text: "@yourhandle", position: bottom-right, opacity: 0.8, size: 30}
 
 render: {resolution: {{res}}, quality: delivery, gpu: true}

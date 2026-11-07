@@ -1,7 +1,7 @@
 {% import "_lib.j2" as lib with context %}
 {#- Clay UI card beat (original: held / gate / choice / crew).
     s.heading: "Every step [checked.]"   s.heading_size: 92
-    s.card: { dark: bool, width: 820, icon: "HC" | image path, title, subtitle, amount,
+    s.card: { dark: bool, width: 820, icon: "AB" | image path, title, subtitle, amount,
               rows: [{label, value, state: released|held|refunded|<text>, strike: bool, icon: check|x}],
               buttons: ["Dispute · refund", "Accept · pay"], hover: 0, click: 1, result: "Released",
               stamp: "BLOCKED" }

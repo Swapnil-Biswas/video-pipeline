@@ -19,6 +19,16 @@
       {%- if captions %}
       <div id="captions" data-composition-id="captions" data-composition-src="compositions/captions.html" data-start="0" data-duration="{{ duration }}" data-track-index="2" data-track-kind="captions" data-width="{{ W }}" data-height="{{ H }}" style="z-index:5"></div>
       {%- endif %}
+      {%- if watermark %}
+      {%- set m = (watermark.margin * u)|round -%}
+      {%- set pos = watermark.position -%}
+      {%- set vy = 'top' if 'top' in pos else ('bottom' if 'bottom' in pos else 'mid') -%}
+      {%- set hx = 'left' if 'left' in pos else ('right' if 'right' in pos else 'mid') -%}
+      <div id="watermark" data-layout-ignore style="position:absolute; z-index:6; pointer-events:none; display:flex; align-items:center; gap:{{ (10*u)|round }}px; opacity:{{ watermark.opacity }}; {% if vy=='top' %}top:{{ m }}px;{% elif vy=='bottom' %}bottom:{{ m }}px;{% else %}top:50%;{% endif %} {% if hx=='left' %}left:{{ m }}px;{% elif hx=='right' %}right:{{ m }}px;{% else %}left:50%;{% endif %} transform:translate({{ '-50%' if hx=='mid' else '0' }}, {{ '-50%' if vy=='mid' else '0' }}); font-family:{{ T.font_body }}; font-weight:700; font-size:{{ (watermark.size*u)|round }}px; letter-spacing:0.01em; color:{{ T.cap_fg }}; text-shadow:0 1px 4px rgba(0,0,0,.55), 0 0 1px rgba(0,0,0,.85);">
+        {%- if watermark.logo %}<img src="{{ watermark.logo }}" alt="" style="height:{{ (watermark.size*1.7*u)|round }}px; width:auto; display:block;" />{% endif %}
+        {%- if watermark.text %}<span>{{ watermark.text }}</span>{% endif %}
+      </div>
+      {%- endif %}
       <!-- AUDIO -->
       <!-- /AUDIO -->
     </div>

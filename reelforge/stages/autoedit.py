@@ -45,6 +45,31 @@ def icon_for(word: str) -> str | None:
     return None
 
 
+EMOJI = {  # keyword (lowercase, prefix match) -> emoji sticker
+    "money": "💰", "cash": "💰", "rich": "💰", "income": "💸", "paid": "💸", "pay": "💸", "dollar": "💵", "price": "💵",
+    "cost": "💵", "budget": "💵", "cheap": "💵", "revenue": "📈", "profit": "📈", "sales": "📈", "growth": "📈", "grow": "🚀",
+    "fast": "⚡", "fastest": "⚡", "speed": "⚡", "quick": "⚡", "viral": "🔥", "fire": "🔥", "hot": "🔥", "trend": "🔥",
+    "best": "🏆", "win": "🏆", "winner": "🏆", "number": "🔢", "idea": "💡", "light": "💡", "smart": "🧠", "brain": "🧠",
+    "think": "🧠", "learn": "🧠", "time": "⏰", "clock": "⏰", "deadline": "⏰", "love": "❤️", "heart": "❤️",
+    "feel": "❤️", "feeling": "❤️", "emotion": "❤️", "emotional": "❤️", "home": "🏠", "house": "🏠", "property": "🏠",
+    "listing": "🏡", "remodel": "🔨", "build": "🔨", "city": "🏙️", "cities": "🏙️", "phone": "📱", "camera": "📷",
+    "video": "🎬", "content": "🎬", "star": "⭐", "quality": "⭐", "people": "👥", "audience": "👥", "team": "👥",
+    "crew": "👥", "goal": "🎯", "target": "🎯", "rocket": "🚀", "launch": "🚀", "check": "✅", "done": "✅", "yes": "✅",
+    "stop": "🛑", "warning": "⚠️", "secret": "🤫", "crazy": "🤯", "mind": "🤯", "wow": "😮", "look": "👀", "miss": "👀",
+    "deal": "🤝", "offer": "🤝", "sign": "✍️", "email": "📧", "message": "💬", "comment": "💬", "call": "📞",
+}
+
+
+def emoji_for(word: str, extra: dict | None = None) -> str | None:
+    w = re.sub(r"[^a-z]", "", word.lower())
+    if not w:
+        return None
+    for k, e in {**EMOJI, **(extra or {})}.items():
+        if w.startswith(k):
+            return e
+    return None
+
+
 def clean(w: str) -> str:
     return re.sub(r"[^\w%$'-]", "", w)
 
@@ -53,7 +78,7 @@ def score_word(w: str) -> float:
     c = clean(w).lower()
     if not c or c in STOP or len(c) < 3:
         return 0.0
-    return len(c) * 0.25 + (3.0 if icon_for(c) else 0.0) + (2.5 if re.search(r"\d", c) else 0.0)
+    return len(c) * 0.25 + (3.0 if (icon_for(c) or emoji_for(c)) else 0.0) + (2.5 if re.search(r"\d", c) else 0.0)
 
 
 # ---------------------------------------------------------------- spans and shots
@@ -197,6 +222,25 @@ def run_stage(p) -> dict:
     overlay_top = safe_zones(Path(foot["path"]), ae["punch"])["overlay_top"]
     k, n_cut, scene_i = 0, 0, 0
     first_sentence = re.split(r"(?<=[.!?])\s", phrases[0]["text"])[0] if phrases else ""
+    # B-roll: cut away to clips other than the talking head while the dialogue track keeps playing
+    foot_dur = {f["id"]: float(f["probe"]["format"]["duration"]) for f in man.get("footage", [])}
+    bc = ae.get("broll") or {}
+    if bc.get("clips", "auto") == "auto":
+        broll_ids = [f["id"] for f in man.get("footage", []) if f["id"] != a["video"]]
+    else:
+        broll_ids = [b for b in (bc.get("clips") or []) if b in foot_dur and b != a["video"]]
+    broll_on = bool(broll_ids) and bc.get("enabled", "auto") not in (False, "off", "false")
+    bevery = bc.get("every", "auto")
+    if bevery == "auto":
+        cpm = (((read_json(p.build / "style" / "style.json") or {}).get("measured") or {}).get("pacing") or {}).get("cuts_per_min") or 0
+        bevery = 2 if cpm >= 24 else 3 if cpm >= 10 else 4
+    bevery = max(2, int(bevery))
+    bmax_run = max(1, int(bc.get("max_run", 1)))
+    broll_cur = {b: min(0.3, foot_dur.get(b, 0.0) * 0.05) for b in broll_ids}
+    bi, belig, brun, n_broll = 0, 0, 0, 0
+    ec = ae.get("emoji") or {}
+    emoji_on = ec.get("enabled", "auto") not in (False, "off", "false")
+    emoji_extra = ec.get("extra") or {}
     while k < len(ranges):
         cs = next((c for c in cut_spans if c[0] == k), None)
         if cs:
@@ -240,11 +284,29 @@ def run_stage(p) -> dict:
                 if score_word(best["text"]) >= ae["keyword_min_score"] and best["start"] - last_overlay > ae["keyword_spacing"]:
                     word = clean(best["text"])
                     sc["overlays"].append({"type": "keyword", "at": round(best["start"] - f0, 3), "text": word.upper(),
-                                           "icon": icon_for(word), "side": "left" if len(overlays_used) % 2 else "right"})
+                                           "icon": icon_for(word), "emoji": emoji_for(word, emoji_extra) if emoji_on else None,
+                                           "side": "left" if len(overlays_used) % 2 else "right"})
                     overlays_used.append(word)
                     last_overlay = best["start"]
         if k == 1 and a.get("name"):
             sc["overlays"].append({"type": "lowerthird", "at": 0.2, "text": a["name"]})
+        # cover this shot with B-roll (picture only; the dialogue track keeps playing underneath)
+        if broll_on and not (k == 0 and ae.get("hook", True)):
+            belig += 1
+            take = belig % bevery == 0 and brun < bmax_run
+            bid = broll_ids[bi % len(broll_ids)] if take else None
+            if take and foot_dur.get(bid, 0.0) >= r["dur"]:
+                cdur = foot_dur[bid]
+                bi += 1
+                ms = broll_cur.get(bid, 0.0)
+                if ms + r["dur"] > cdur - 0.1:                       # ran past the clip; restart near the top
+                    ms = min(0.3, max(0.0, cdur * 0.05))
+                broll_cur[bid] = ms + r["dur"]
+                sc.update({"video": bid, "media_start": round(ms, 3), "audio": False, "push": [1.0, 1.04], "broll": True})
+                brun += 1
+                n_broll += 1
+            else:
+                brun = 0
         scenes.append(sc)
         k += 1
         scene_i += 1
@@ -259,11 +321,13 @@ def run_stage(p) -> dict:
             "talk_end": talk_end, "removed_s": round(removed, 3), "source_duration": dur}
     write_json(p.build / "autoedit" / "plan.json", plan)
     n_ov = sum(len(s.get("overlays", [])) for s in scenes)
-    log.info("  %.1fs of speech kept from %.1fs (%.1fs of pauses cut), %d shots, %d cutaways, %d overlays%s",
-             talk_end, dur, removed, sum(1 for s in scenes if s["type"] == "footage"), n_cut, n_ov,
+    log.info("  %.1fs of speech kept from %.1fs (%.1fs of pauses cut), %d shots (%d B-roll), %d cutaways, %d overlays%s",
+             talk_end, dur, removed, sum(1 for s in scenes if s["type"] == "footage"), n_broll, n_cut, n_ov,
              ", outro" if out_cfg else "")
     for s in scenes:
         extra = s.get("entry", "")
+        if s.get("broll"):
+            extra += f" BROLL:{s['video']}"
         if s["type"] == "list":
             extra += f" LIST {s['items']}"
         for o in s.get("overlays", []):

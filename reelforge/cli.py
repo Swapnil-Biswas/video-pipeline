@@ -227,6 +227,27 @@ def cmd_job_approve(a) -> int:
     return _report_job(jobs.process(a.id))
 
 
+def cmd_fetch(a) -> int:
+    """Download licence-clear media into assets/broll/<category>/ or assets/sfx/fetched/."""
+    from . import fetch
+    from .config import ROOT
+    if a.kind == "broll":
+        out = ROOT / "assets" / "broll" / a.category
+        got = fetch.broll(a.query, out, a.count, a.source, a.orientation)
+    elif a.kind == "image":
+        out = ROOT / "assets" / "broll" / a.category
+        got = fetch.image(a.query, out, a.count)
+    else:
+        out = ROOT / "assets" / "sfx" / "fetched"
+        got = fetch.sfx(a.query, out, a.count)
+    print(f"fetched {len(got)} {a.kind} file(s) -> {out}")
+    for g in got:
+        print("  ", Path(g).name)
+    if a.kind in ("sfx", "image") and got:
+        print("  (Creative-Commons: see the .attrib.txt sidecars for required attribution before publishing)")
+    return 0 if got else 1
+
+
 def cmd_serve(a) -> int:
     import uvicorn
     uvicorn.run("reelforge.server:app", host=a.host, port=a.port, log_level="info", workers=1)
@@ -268,10 +289,18 @@ def main(argv=None) -> int:
     sv = sub.add_parser("serve", help="run the HTTP API")
     sv.add_argument("--host", default="127.0.0.1")
     sv.add_argument("--port", type=int, default=8088)
+    f = sub.add_parser("fetch", help="download licence-clear media into the asset library (Pexels/Pixabay video, Openverse SFX/images)")
+    f.add_argument("kind", choices=["broll", "sfx", "image"])
+    f.add_argument("query")
+    f.add_argument("-n", "--count", type=int, default=5)
+    f.add_argument("--category", default="misc", help="broll/image subfolder under assets/broll/")
+    f.add_argument("--source", choices=["pexels", "pixabay"], default="pexels", help="B-roll video source")
+    f.add_argument("--orientation", choices=["portrait", "landscape", "square"], default="portrait")
     a = ap.parse_args(argv)
     try:
         return {"run": cmd_run, "approve": cmd_approve, "status": cmd_status, "doctor": cmd_doctor, "new": cmd_new,
-                "edit": cmd_edit, "job-status": cmd_job_status, "job-approve": cmd_job_approve, "serve": cmd_serve}[a.cmd](a)
+                "edit": cmd_edit, "job-status": cmd_job_status, "job-approve": cmd_job_approve, "serve": cmd_serve,
+                "fetch": cmd_fetch}[a.cmd](a)
     except PipelineError as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
