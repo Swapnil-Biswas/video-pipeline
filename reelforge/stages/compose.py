@@ -259,8 +259,11 @@ def run_stage(p) -> dict:
             for c in s.get("cues") or []:           # optional cues in scene-local time
                 cue(c[0], s["start"] + float(c[1]), c[2])
             continue
-        if s["type"] == "footage" and s["video"] not in footage_ids:
-            raise PipelineError(f"scene '{sid}': footage id '{s['video']}' is not in project.footage")
+        if s["type"] == "footage":
+            if s["video"] not in footage_ids:
+                raise PipelineError(f"scene '{sid}': footage id '{s['video']}' is not in project.footage")
+            if "audio" not in s:                       # keep the raw clip's own sound by default;
+                s = {**s, "audio": s["video"] != ar}   # mute only when this clip is the aroll dialogue source
         s = esc(s)
         ctx = {"s": s, "W": W, "H": H, "u": u, "id": sid, "T": T, "G": G}
         if s["type"] == "chat":
@@ -297,10 +300,26 @@ def run_stage(p) -> dict:
     css = "\n".join(p.path(c).read_text(encoding="utf-8") for c in p.cfg["style"]["css"])
     if p.cfg.get("theme"):
         css += theme_css(T)
+
+    # persistent brand watermark / handle, drawn over every frame
+    wm = (p.cfg.get("brand") or {}).get("watermark") or {}
+    watermark = None
+    if wm.get("text") or wm.get("logo"):
+        logo_rel = None
+        if wm.get("logo"):
+            lsrc = p.path(wm["logo"])
+            if not lsrc.exists():
+                raise PipelineError(f"brand.watermark.logo not found: {lsrc}")
+            copy_into(lsrc, hf / "assets" / "brand" / lsrc.name)
+            logo_rel = f"assets/brand/{lsrc.name}"
+        watermark = {"text": esc(wm.get("text")) if wm.get("text") else None, "logo": logo_rel,
+                     "position": wm.get("position", "bottom-right"), "opacity": float(wm.get("opacity", 0.8)),
+                     "size": int(wm.get("size", 30)), "margin": int(wm.get("margin", 54))}
+
     idx_env = jinja2.Environment(loader=jinja2.FileSystemLoader(str(p.root / "templates")), autoescape=False)
     index = idx_env.get_template("index.html.j2").render(
-        W=W, H=H, fps=p.fps, duration=num(p.duration), scenes=[{**x, 'start': str(float(x['start'])), 'duration': str(float(x['duration']))} for x in scenes], css=css, gsap=p.cfg["style"]["gsap"],
-        motion_blur=p.cfg["canvas"].get("motion_blur", True), captions=captions, project_file=str(p.dir / "project.yaml"))
+        W=W, H=H, u=u, T=T, fps=p.fps, duration=num(p.duration), scenes=[{**x, 'start': str(float(x['start'])), 'duration': str(float(x['duration']))} for x in scenes], css=css, gsap=p.cfg["style"]["gsap"],
+        motion_blur=p.cfg["canvas"].get("motion_blur", True), captions=captions, watermark=watermark, project_file=str(p.dir / "project.yaml"))
     (hf / "index.html").write_text(index, encoding="utf-8", newline="\n")
     write_json(p.build / "compose" / "cues.json", {"cues": sorted(cues, key=lambda c: c[1]), "ducks": sorted(set(ducks))})
     log.info("  %d scenes, %.2fs, %d auto cues, %d click ducks%s", len(scenes), p.duration, len(cues), len(set(ducks)),

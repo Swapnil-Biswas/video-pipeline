@@ -15,3 +15,24 @@ projects/*/refs/*.info.json
 .env
 .venv/
 venv/
+
+# third-party reference library videos (owned by their creators; download them yourself, see reference-videos/README.md)
+reference-videos/*.mp4
+reference-videos/*.info.json
+reference-videos/_download.log
+
+# generated / downloaded B-roll library (regenerate with scripts/generate-broll.sh; download real stock yourself)
+assets/broll/**/*.mp4
+assets/broll/_gen.log
+
+# fetched third-party CC sound effects / media (attribution sidecars kept)
+assets/sfx/fetched/*.mp3
+assets/sfx/fetched/*.wav
+assets/sfx/fetched/*.ogg
+assets/sfx/fetched/*.flac
+
+# downloaded raw/source footage per project (owned by their creators; supply your own)
+projects/*/assets/footage/*.mp4
+
+# editor scratch / backups
+*.bak

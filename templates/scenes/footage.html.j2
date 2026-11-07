@@ -1,7 +1,7 @@
 {% import "_lib.j2" as lib with context %}
 {#- Footage shot: an ingested clip, full-frame, with a slow push, transitions and motion-graphics overlays.
     s.video: footage id   s.media_start: seconds into the clip   s.fit: cover|contain   s.push: [1.0, 1.08]
-    s.audio: false (true keeps the clip's own sound; with aroll the dialogue is a separate continuous track)
+    s.audio: default true keeps the clip's own sound; set false to mute. Auto-muted only when this clip is the aroll dialogue source.
     s.lines: [{text: "...[accent]", size: 96}]   s.caption_pos: bottom|middle|center
     s.overlays: [{type: keyword, at, text, icon, side} | {type: stat, at, value, suffix, label} | {type: lowerthird, at, text}]
     s.entry: none|cut|punch|zoom-blur|flash|shake|whip-left|whip-right|push-up|blur   s.exit as in kinetic -#}
@@ -28,6 +28,7 @@
     #{{ id }}-root .kw .pill { font-family: {{ T.font_display }};{% if T.display_upper %} text-transform: uppercase;{% endif %}  font-size: {{ (62*u)|round }}px; font-weight: 700; letter-spacing: -0.03em; padding: 0.06em 0.42em 0.12em; border-radius: 999px; }
     #{{ id }}-root .kw .tile { width: {{ (120*u)|round }}px; height: {{ (120*u)|round }}px; border-radius: 30%; display: grid; place-items: center; flex: none; }
     #{{ id }}-root .kw .tile svg { width: 54%; height: 54%; fill: none; stroke: currentColor; stroke-width: 4.5; stroke-linecap: round; stroke-linejoin: round; }
+    #{{ id }}-root .kw .emo { font-size: {{ (104*u)|round }}px; line-height: 1; flex: none; filter: drop-shadow(0 {{ (4*u)|round }}px {{ (10*u)|round }}px rgba(0,0,0,.35)); }
     /* stat card */
     #{{ id }}-root .st { position: absolute; left: 50%; top: {{ (H*((o_top or 0.12) - 0.03))|round }}px; transform: translateX(-50%); padding: {{ (26*u)|round }}px {{ (52*u)|round }}px; border-radius: {{ (40*u)|round }}px; text-align: center; }
     #{{ id }}-root .st .n { font-family: {{ T.font_display }};{% if T.display_upper %} text-transform: uppercase;{% endif %}  font-size: {{ (150*u)|round }}px; font-weight: 700; letter-spacing: -0.05em; line-height: 1; font-variant-numeric: tabular-nums; }
@@ -54,7 +55,7 @@
     {%- for o in (s.overlays or []) %}
     {%- if o.type == 'keyword' %}
     <div class="kw {{ o.side or 'right' }}" id="{{ id }}-o{{ loop.index0 }}">
-      {%- if o.icon %}<div class="tile clay clay--dark" id="{{ id }}-o{{ loop.index0 }}t">{{ lib.glyph(o.icon) }}</div>{% endif %}
+      {%- if o.emoji %}<div class="emo" id="{{ id }}-o{{ loop.index0 }}t">{{ o.emoji }}</div>{% elif o.icon %}<div class="tile clay clay--dark" id="{{ id }}-o{{ loop.index0 }}t">{{ lib.glyph(o.icon) }}</div>{% endif %}
       <span class="pill acc" id="{{ id }}-o{{ loop.index0 }}p">{{ o.text }}</span>
     </div>
     {%- elif o.type == 'stat' %}
@@ -83,7 +84,7 @@
       {%- for o in (s.overlays or []) %}{% set oid = id ~ '-o' ~ loop.index0 %}{% set t = [o.at, 0.05]|max %}{% set hold = [1.25, d - t - 0.25]|min %}
       {%- if o.type == 'keyword' %}{% set dx = (-1 if o.side == 'left' else 1) * 60 * u %}
       tl.fromTo("#{{ oid }}", { opacity: 0, x: {{ dx|round }} }, { opacity: 1, x: 0, duration: 0.28, ease: "back.out(1.8)" }, {{ t }});
-      {%- if o.icon %}
+      {%- if o.icon or o.emoji %}
       tl.fromTo("#{{ oid }}t", { scale: 0.3, rotation: {{ -14 if o.side == 'left' else 14 }} }, { scale: 1, rotation: {{ -6 if o.side == 'left' else 6 }}, duration: 0.4, ease: "back.out(2.4)" }, {{ t + 0.05 }});
       {%- endif %}
       tl.fromTo("#{{ oid }}p", { scale: 0.6 }, { scale: 1, duration: 0.32, ease: "back.out(2.2)" }, {{ t + 0.08 }});

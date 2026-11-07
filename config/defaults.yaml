@@ -18,6 +18,16 @@ style:
 # folders copied into the generated HyperFrames project under assets/<folder name>
 assets: [assets/fonts, assets/brand, assets/sfx]
 
+# Persistent brand watermark / handle, drawn over every frame (like the @handle creator reels keep in a corner).
+brand:
+  watermark:
+    text: null            # e.g. "@yourhandle" — a persistent handle/watermark (null = off)
+    logo: null            # optional image path instead of / beside the text
+    position: bottom-right   # top-left | top | top-right | left | right | bottom-left | bottom | bottom-right
+    opacity: 0.8
+    size: 30              # px at the 1080-wide base, scaled with the canvas
+    margin: 54            # px from the edges (base)
+
 references: []            # [{url: ...} | {src: path}]  -> ingest + analyze
 footage: []               # [{src: path | url, id: name, trim: [start, end]}]  -> ingest (copied to assets/footage)
 
@@ -59,6 +69,14 @@ autoedit:                 # used when a project sets `scenes: auto` (talking-hea
   max_duration: 30        # montage length cap (seconds)
   keep_footage_audio: false   # montage: keep each clip's own sound under the music
   transition_weights: null    # {cut, flash, zoom-blur, punch}; learned from the reference when style.from_reference
+  broll:                      # talking-head: cut away to B-roll clips while the dialogue keeps playing
+    enabled: auto            # auto (on when footage has clips other than aroll.video) | true | false
+    clips: auto              # auto (every footage id except aroll.video) | [list of footage ids]
+    every: auto              # cover every Nth eligible shot with B-roll; auto = learn cadence from the reference cut-rate
+    max_run: 1               # at most this many B-roll shots in a row (keep cutting back to the speaker)
+  emoji:                     # pop an emoji sticker on keyword overlays (money->💰, fast->⚡, emotional->❤️ ...)
+    enabled: auto            # auto | true | false
+    extra: {}                # add/override mappings, e.g. {listing: 🏡, offer: 🤝}
 
 analyze:
   sheet_fps: 4            # original: 4 fps contact sheets

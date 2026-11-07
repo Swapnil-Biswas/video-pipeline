@@ -1,0 +1,47 @@
+# reelforge project — auto talking-head edit.
+# Captions are the speaker's OWN transcribed words from the raw video.
+name: ig-sample
+
+canvas: {width: 1080, height: 1920, fps: 60, motion_blur: true}
+
+# Learn pacing, transitions, palette (red accent), fonts, caption look and grade from the reference.
+style:
+  from_reference: true
+
+references:
+  - src: refs/ref.mp4      # Dafm0IHmGiY — style/energy/motion reference
+
+footage:
+  - {id: main, src: assets/footage/raw.mp4}                      # aroll talking head; autoedit trims silence
+  - {id: broll1, src: assets/footage/raw.mp4, trim: [8.0, 12.0]}   # property B-roll the editor cuts away to
+  - {id: broll2, src: assets/footage/raw.mp4, trim: [20.0, 24.0]}
+  - {id: broll3, src: assets/footage/raw.mp4, trim: [36.0, 40.0]}
+
+# The raw clip's audio is the dialogue track that drives the edit and the captions.
+aroll:
+  video: main
+
+# Whisper transcribes the raw video's speech into word timings.
+transcribe:
+  enabled: true
+  language: en              # the spoken language; null = auto-detect
+
+# Word-synced captions, 'reel' pill style (matches the reference). Words = the transcript above.
+captions:
+  enabled: true
+  style: reel
+
+# Let the autoeditor cut a talking-head reel from the transcript (jump-cuts, punch-ins,
+# keyword pop-ups, a hook title and a closing card).
+scenes: auto
+autoedit:
+  hook: true
+  outro: null               # no end card — the reel ends on the last shot
+
+music: {mode: none}         # none | file | take | generate (MusicGen; slow on CPU-only Mac)
+voice: {mode: none}
+
+render: {resolution: portrait, quality: delivery, gpu: true}
+
+brand:
+  watermark: {text: "@realestate", position: bottom-right, opacity: 0.8, size: 30}
