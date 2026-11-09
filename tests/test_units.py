@@ -7,7 +7,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from reelforge.config import load_project  # noqa: E402
-from reelforge.stages.compose import caption_phrases, chat_layout, split_words  # noqa: E402
+from reelforge.stages.compose import caption_phrases, split_words  # noqa: E402
 from reelforge.util import PipelineError, num  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -29,19 +29,17 @@ class Words(unittest.TestCase):
 
 class Config(unittest.TestCase):
     def test_samples_load(self):
-        for name in ("showreel", "demo-portrait"):
-            p = load_project(ROOT / "projects" / name)
-            self.assertGreater(p.duration, 0)
-        self.assertAlmostEqual(load_project(ROOT / "projects" / "showreel").duration, 28.0)
+        p = load_project(ROOT / "projects" / "reel-talk")
+        self.assertEqual(p.cfg["scenes"], "auto")
 
     def test_overrides(self):
-        p = load_project(ROOT / "projects" / "showreel", ["render.resolution=landscape", "canvas.fps=30"])
-        self.assertEqual(p.cfg["render"]["resolution"], "landscape")
-        self.assertEqual(p.fps, 30)
+        p = load_project(ROOT / "projects" / "reel-talk", ["render.resolution=portrait-4k", "canvas.fps=60"])
+        self.assertEqual(p.cfg["render"]["resolution"], "portrait-4k")
+        self.assertEqual(p.fps, 60)
 
     def test_aspect_mismatch_rejected(self):
         with self.assertRaises(PipelineError):
-            load_project(ROOT / "projects" / "showreel", ["render.resolution=portrait"])
+            load_project(ROOT / "projects" / "reel-talk", ["render.resolution=landscape"])
 
     def test_bad_scene_rejected(self):
         with tempfile.TemporaryDirectory() as d:
@@ -50,36 +48,9 @@ class Config(unittest.TestCase):
                 load_project(d)
 
 
-class Chat(unittest.TestCase):
-    def scene(self):
-        return {"duration": 4.0, "groups": [{"who": "AI agent", "messages": [
-            {"side": "out", "text": "Can you put my invoice emails in a Sheet?"},
-            {"side": "in", "text": "Done!"},
-            {"side": "out", "text": "IT ACTUALLY WORKED", "big": True}]}]}
-
-    def test_layout_fits_frame(self):
-        for W, H in ((1920, 1080), (1080, 1920), (1080, 1080)):
-            L = chat_layout(self.scene(), W, H, "c")
-            for m in L["msgs"]:
-                x0 = m["edge"] if m["side"] == "in" else W - m["edge"] - m["w"]
-                self.assertGreaterEqual(x0, 0)
-                self.assertLessEqual(x0 + m["w"], W + 1)
-            ts = [m["t"] for m in L["msgs"]]
-            self.assertEqual(ts, sorted(ts))
-            self.assertIsNotNone(L["zoom_through"])
-            for a, b in zip(L["cams"], L["cams"][1:]):     # camera moves never overlap
-                self.assertLessEqual(a["t"] + a["d"], b["t"] + 1e-6)
-
-    def test_too_short_scene_rejected(self):
-        s = self.scene()
-        s["duration"] = 1.0
-        with self.assertRaises(PipelineError):
-            chat_layout(s, 1920, 1080, "c")
-
-
 class Captions(unittest.TestCase):
     def test_phrases(self):
-        words = [{"text": t, "start": i * 0.3, "end": i * 0.3 + 0.25} for i, t in enumerate("Pay only for finished work. HireCrew.".split())]
+        words = [{"text": t, "start": i * 0.3, "end": i * 0.3 + 0.25} for i, t in enumerate("Pay only for finished work. Today.".split())]
         P = caption_phrases(words, 4)
         self.assertEqual([len(p["words"]) for p in P], [4, 1, 1])
         for a, b in zip(P, P[1:]):
@@ -190,7 +161,7 @@ class StyleAndTheme(unittest.TestCase):
         fast = derive_edit({"median_shot": 0.9, "cuts_per_min": 60}, {"weights": {"flash": 0.5}}, {"energy": 0.6})
         slow = derive_edit({"median_shot": 4.0, "cuts_per_min": 10}, {"weights": {}}, {"energy": 0.1})
         self.assertLess(fast["max_shot"], slow["max_shot"])
-        self.assertEqual(fast["punch_every"], 2)
+        self.assertEqual(fast["punch_every"], 3)
 
     def test_grade_is_bounded(self):
         ref = {"luma": 90, "contrast": 60, "saturation": 250, "warmth": 40, "flat_ratio": 0.0, "vignette": 0.9,
@@ -203,12 +174,13 @@ class StyleAndTheme(unittest.TestCase):
         self.assertLessEqual(g["details"]["vignette"], 0.3)
 
     def test_caption_style_choice(self):
-        self.assertEqual(derive_captions({"has_text": True, "captions": True, "words_per_line": 1}, 0.5)["style"], "slam")
+        self.assertEqual(derive_captions({"has_text": True, "captions": True, "words_per_line": 1}, 0.5)["style"], "stroke")
         self.assertEqual(derive_captions({"has_text": True, "captions": True, "words_per_line": 3, "highlight_color": "#ff0000"}, 0.5)["style"], "highlight")
 
     def test_transition_mix(self):
         self.assertEqual(pick_transition({"transition_weights": {"flash": 0.0, "zoom-blur": 0.0, "punch": 0.0}}, 5, True), "punch")
-        self.assertEqual(pick_transition({"transition_weights": {"flash": 0.5}}, 1, False), "flash")
+        self.assertEqual(pick_transition({"transition_weights": {"flash": 0.5}}, 1, True), "flash")
+        self.assertEqual(pick_transition({}, 1, False), "cut")
         self.assertEqual(pick_transition({}, 4, False, into_graphic=True), "zoom-blur")
 
 

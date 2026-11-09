@@ -255,7 +255,7 @@ def cmd_serve(a) -> int:
 
 
 def main(argv=None) -> int:
-    ap = argparse.ArgumentParser(prog="reelforge", description="HireCrew-style motion-graphics video pipeline (HyperFrames)")
+    ap = argparse.ArgumentParser(prog="reelforge", description="Reference-driven short-form video editing pipeline (HyperFrames)")
     sub = ap.add_subparsers(dest="cmd", required=True)
     r = sub.add_parser("run")
     r.add_argument("project")

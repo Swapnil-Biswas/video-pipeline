@@ -1,4 +1,4 @@
-# Prompt library used by the pipeline. Original prompts are verbatim from the HireCrew session.
+# Prompt library used by the pipeline. Original prompts are kept as reusable starting points.
 # Derived prompts (marked) are new and are meant for a human or an AI assistant at the review checkpoints.
 
 musicgen:

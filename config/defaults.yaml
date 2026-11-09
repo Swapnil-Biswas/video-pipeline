@@ -1,5 +1,5 @@
 # reelforge defaults. A project's project.yaml overrides any key (deep merge).
-# Values marked "original" are the exact settings used for the HireCrew showreel.
+# Values are tuned for short-form talking-head and montage edits.
 
 canvas:
   width: 1920
@@ -8,15 +8,15 @@ canvas:
   motion_blur: true       # original: data-motion-blur="on"
 
 style:
-  css: [style/hirecrew-bw.css]      # brand head CSS (tokens, clay classes, worlds)
+  css: [style/base.css]      # neutral structure; colours and fonts come from the theme
   from_reference: false   # true: learn pacing, transitions, palette, fonts, captions, grade and music from references[0]
   ocr: true               # read the reference's on-screen text (EasyOCR) for caption style and font
   grade: true             # match the footage's colour grade to the reference (HyperFrames realtime grading)
   gsap: "https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"
-  font_family: '"Instrument Sans", sans-serif'
+  font_family: '"Inter", sans-serif'
 
 # folders copied into the generated HyperFrames project under assets/<folder name>
-assets: [assets/fonts, assets/brand, assets/sfx]
+assets: [assets/sfx]
 
 # Persistent brand watermark / handle, drawn over every frame (like the @handle creator reels keep in a corner).
 brand:
@@ -48,22 +48,26 @@ transcribe:               # Whisper on the GPU (transformers)
   max_window_s: 7.0
   fixes: []               # caption proofreading: [[regex, replacement], ...] applied to the caption text
 
+dialog:
+  chain: "highpass=f=80,afftdn=nf=-28,acompressor=threshold=-20dB:ratio=3:attack=5:release=90:makeup=3,loudnorm=I=-16:TP=-2:LRA=9"   # voice clean-up for talking footage
+
 autoedit:                 # used when a project sets `scenes: auto` (talking-head editing from the transcript)
   trim_silence: true
-  min_gap: 0.32           # pauses longer than this are cut out
-  pad: 0.08               # seconds kept around speech
-  min_shot: 1.3           # jump-cut rhythm
-  max_shot: 4.2
+  min_gap: 0.22           # pauses longer than this are cut out
+  pad: 0.05               # seconds kept around speech
+  min_shot: 1.6           # jump-cut rhythm
+  max_shot: 4.5
+  punch_hi: 1.26          # tight framing for emphasis
   punch: 1.14             # punch-in framing used on every other shot
-  punch_every: 3          # a zoom-punch transition every Nth cut (others are hard cuts)
+  punch_every: 5          # a zoom-punch transition every Nth cut (others are hard cuts)
   cutaways: true          # full-screen motion graphics for lists said aloud
   list_heading: null      # e.g. "What you [need]"
   keyword_min_score: 2.0
-  keyword_spacing: 3.0    # seconds between keyword pop-ups
+  keyword_spacing: 4.5    # seconds between keyword pop-ups
   hook: true              # hook title over the first shot (from the first sentence unless hook_text is set)
   hook_text: null         # [[line, size], ...]
   outro: null             # e.g. {type: kinetic, duration: 2.6, lines: [{text: "Still want to [start?]", size: 130}]}
-  progress_bar: true
+  progress_bar: false
   mode: auto              # auto: talking-head when the A-roll has speech, else montage | talk | montage
   min_words_for_talk: 8
   max_duration: 30        # montage length cap (seconds)
@@ -133,10 +137,12 @@ voice:
 
 captions:
   enabled: false          # word-synced captions from the transcript (or the voice words)
-  style: subtle           # subtle: small boxed line | reel: bold 2-4 word groups, active word in a pill
-  max_words: 4
+  style: stroke           # stroke: white outlined word groups, spoken word in the accent colour | highlight | pill | color | clean | slam | subtle
+  upper: true
+  box: false
+  max_words: 3
   size: 34                # subtle style size; reel style uses reel_size
-  reel_size: 62
+  reel_size: 78
   bottom: 70              # px from the bottom (subtle); reel style sits at reel_y (fraction of height)
   reel_y: 0.74
 

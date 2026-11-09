@@ -350,30 +350,24 @@ def derive_edit(pacing, trans, motion) -> dict:
     w = trans["weights"]
     e = motion["energy"]
     return {
-        "min_shot": round(max(0.7, min(3.0, avg * 0.6)), 2),
-        "max_shot": round(max(1.6, min(6.0, avg * 1.6)), 2),
-        "punch": round(1.08 + 0.1 * min(1.0, e * 1.5 + w.get("punch", 0)), 3),
-        "punch_every": 2 if (w.get("punch", 0) > 0.25 or pacing.get("cuts_per_min", 0) > 35) else 3,
+        # a single camera can't be cut as fast as a multi-source reference without looking chopped
+        "min_shot": round(max(1.5, min(3.0, avg * 0.8)), 2),
+        "max_shot": round(max(3.2, min(6.0, avg * 2.0)), 2),
+        "punch": round(1.12 + 0.04 * min(1.0, e), 3),
+        "punch_hi": round(1.24 + 0.06 * min(1.0, e), 3),
+        "punch_every": 3 if (w.get("punch", 0) > 0.25 or pacing.get("cuts_per_min", 0) > 35) else 5,
         "transition_weights": {"cut": max(0.25, w.get("cut", 0) + w.get("punch", 0) * 0.5), "flash": w.get("flash", 0),
                                "zoom-blur": w.get("blur", 0), "punch": w.get("punch", 0) * 0.5 + 0.1},
-        "keyword_spacing": round(max(2.0, min(6.0, 4.5 - e * 3)), 2),
+        "keyword_spacing": round(max(3.5, min(7.0, 6.0 - e * 3)), 2),
         "energy": e,
     }
 
 
 def derive_captions(text, energy) -> dict:
-    if not text.get("has_text") or not text.get("captions"):
-        return {"style": "pill" if energy > 0.25 else "clean", "reel_y": 0.74, "upper": False, "box": True, "max_words": 3}
-    wpl = int(text.get("words_per_line", 3))
-    if wpl <= 1:
-        style = "slam"
-    elif text.get("highlight_color"):
-        style = "highlight"
-    else:
-        style = "color" if text.get("upper_ratio", 0) > 0.7 else "pill"
-    return {"style": style, "reel_y": round(min(0.86, max(0.55, text.get("caption_y", 0.74) - text.get("caption_h", 0.03))), 3),
-            "upper": text.get("upper_ratio", 0) > 0.7, "box": True,     # over footage a backing keeps captions readable
-            "max_words": max(1, min(4, wpl)), "reel_size": int(max(44, min(96, text.get("caption_h", 0.035) * 1920 * 0.9)))}
+    """Outlined word-group captions unless the reference clearly uses coloured highlight blocks."""
+    upper = text.get("upper_ratio", 0) > 0.7 if text.get("has_text") else True
+    style = "highlight" if text.get("captions") and text.get("highlight_color") else "stroke"
+    return {"style": style, "upper": upper, "box": style == "highlight", "max_words": max(2, min(3, int(text.get("words_per_line", 3) or 3)))}
 
 
 def derive_grade(ref, foot) -> dict | None:
@@ -383,17 +377,18 @@ def derive_grade(ref, foot) -> dict | None:
     k = max(0.25, 1.0 - ref["flat_ratio"])       # flat motion-graphics frames say little about how footage should look
     clamp = lambda v, a: round(max(-a, min(a, v)), 3)
     adjust = {
-        "exposure": clamp((ref["luma"] - foot["luma"]) / 60 * k, 0.35),
-        "contrast": clamp((ref["contrast"] - foot["contrast"]) / 40 * k, 0.3),
-        "saturation": clamp((ref["saturation"] - foot["saturation"]) / 120 * k, 0.35),
-        "temperature": clamp((ref["warmth"] - foot["warmth"]) / 18 * k, 0.3),
+        # bounded so skin stays natural whatever the reference looks like
+        "exposure": clamp((ref["luma"] - foot["luma"]) / 60 * k, 0.15),
+        "contrast": clamp((ref["contrast"] - foot["contrast"]) / 40 * k, 0.12),
+        "saturation": clamp((ref["saturation"] - foot["saturation"]) / 120 * k, 0.15),
+        "temperature": clamp((ref["warmth"] - foot["warmth"]) / 18 * k, 0.12),
     }
     adjust = {a: v for a, v in adjust.items() if abs(v) >= 0.02}
     out = {"adjust": adjust} if adjust else {}
     wheels = {}
     for zone, key in (("shadows", "shadow_tint"), ("highlights", "highlight_tint")):
         t = ref[key]
-        amt = round(min(0.12, t["amount"] / 60 * k), 3)
+        amt = round(min(0.04, t["amount"] / 60 * k), 3)
         if amt >= 0.02 and t["hue"] == t["hue"]:          # skip NaN hues
             wheels[zone] = {"hue": t["hue"], "amount": amt, "level": 0}
     if wheels:
@@ -470,7 +465,7 @@ def run_stage(p) -> dict:
     log.info("  palette: %s", " ".join(f"{c['hex']}({c['share']:.0%})" for c in pal[:6]))
     log.info("  theme: dark %s light %s accent %s/%s, display font %s%s", theme["dark1"], theme["light1"], theme["accent"],
              theme["on_accent"], theme["font_display"].split(",")[0], " UPPER" if theme["display_upper"] else "")
-    log.info("  captions: %s (y %.2f, upper %s, %s words) | text in %s of frames", caps["style"], caps["reel_y"], caps["upper"],
+    log.info("  captions: %s (upper %s, %s words) | text in %s of frames", caps["style"], caps["upper"],
              caps["max_words"], text.get("frames_with_text", "n/a"))
     log.info("  grade for footage: %s", grade)
     log.info("  music: %s", music.get("prompt"))

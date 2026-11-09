@@ -1,7 +1,7 @@
 """Stage 3 · music: generate takes with MusicGen (GPU), score them objectively, arrange the best one to the film.
 
 Ported from the original scripts: scratchpad/music/batch_reel2.py (generation), score.py (take scoring)
-and video-showreel/tools/music.py (stretch to BPM, beat on the drop, low-passed intro, master)."""
+and the original arranger (stretch to BPM, beat on the drop, low-passed intro, master)."""
 from __future__ import annotations
 
 import json

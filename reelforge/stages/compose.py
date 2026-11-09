@@ -1,12 +1,11 @@
 """Stage 5 · compose: build a complete HyperFrames project in build/<name>/hf from the storyboard.
 
-- `file` scenes are copied verbatim (custom hand-authored compositions, e.g. the original showreel scenes).
+- `file` scenes are copied verbatim (custom hand-authored compositions).
 - template scenes (kinetic, card, chat, endcard, footage) are rendered from templates/scenes/*.j2 with Jinja.
 - templates emit sound cues and click ducks while rendering; they are saved for the sfx stage."""
 from __future__ import annotations
 
 import json
-import math
 import re
 import shutil
 from pathlib import Path
@@ -45,109 +44,6 @@ def split_words(text: str) -> list[tuple[str, bool]]:
     return out
 
 
-# ---------------------------------------------------------------- chat layout + camera path
-def chat_layout(s: dict, W: int, H: int, sid: str) -> dict:
-    u = min(W, H) / 1080
-    colW = min(1060 * u, W * 0.86)
-    left = (W - colW) / 2
-    right = left + colW
-    s_close = min(1.6, (W * 0.94) / colW)
-    groups = s.get("groups") or [{"messages": s.get("messages", [])}]
-    step_default = float(s.get("step", 0.62))
-    msgs, labels, cams, swipes, glows = [], [], [], [], []
-    t = 0.0
-    y_top = 300 * u
-    gap = 26 * u
-    first_visible = bool(s.get("first_visible", True))
-    n_total = sum(len(g["messages"]) for g in groups)
-    k = 0
-    for gi, g in enumerate(groups):
-        y = y_top
-        g_start_y = y
-        glows.append({"x": W / 2 - 500 * u, "y": y_top - 400 * u, "r": 1000 * u})
-        label_done = False
-        g_first_t = None
-        for mi, m in enumerate(g["messages"]):
-            side = m.get("side", "out")
-            big = bool(m.get("big"))
-            fs = (70 if big else 40) * u
-            pad_x = (42 if big else 32) * u * 2
-            time_w = (18 + 22 * 0.62 * len(m.get("time", ""))) * u if m.get("time") else 0
-            est = len(m["text"]) * fs * (0.62 if big else 0.56) + time_w
-            maxw = colW if big else colW * 0.88
-            lines = max(1, math.ceil(est / (maxw - pad_x)))
-            h = (52 if big else 46) * u + lines * fs * 1.2
-            width = min(maxw, est + pad_x)
-            if side == "in" and g.get("who") and not label_done:
-                labels.append({"id": f"{sid}-w{gi}", "x": left + 6 * u, "y": y, "text": g["who"], "note": g.get("note"),
-                               "avatar": g.get("avatar"), "t": None, "g": gi})
-                y += 52 * u
-                label_done = True
-            # timing
-            if m.get("at") is not None:
-                t = float(m["at"])
-            elif k == 0:
-                t = 0.0 if first_visible else 0.35
-            else:
-                t += float(m.get("step", step_default)) + (0.5 if side == "in" else 0)
-            if gi > 0 and mi == 0 and m.get("at") is None:
-                t += 0.55                                  # swipe between chats
-            if labels and labels[-1]["t"] is None and labels[-1]["g"] == gi:
-                labels[-1]["t"] = round(max(0.0, t - 0.55), 3)
-            if g_first_t is None:
-                g_first_t = t
-            mid = f"{sid}-m{k}"
-            edge = left if side == "in" else W - right
-            msgs.append({"id": mid, "side": side, "text": m["text"], "time": m.get("time"), "big": big, "edge": edge,
-                         "y": y, "h": h, "w": width, "maxw": maxw, "nowrap": lines == 1, "t": round(t, 3),
-                         "dots": side == "in" and m.get("typing", True) and not (k == 0 and first_visible), "g": gi})
-            # camera: frame this message (column always fully inside the frame horizontally)
-            cy = y + h / 2
-            is_last_in_group = mi == len(g["messages"]) - 1
-            if big:
-                # punch in on the payoff, centred on the bubble itself, never wider than the frame
-                zb = min(1.5, (W * 0.86) / max(width * 1.1, 1))
-                bx = (W - edge - width / 2) if side == "out" else (edge + width / 2)
-                cams.append({"t": round(t + 0.07, 3), "d": 0.18, "x": bx, "y": cy, "s": round(zb * 1.05, 3), "ease": "power3.out"})
-                cams.append({"t": round(t + 0.25, 3), "d": 0.6, "x": bx, "y": cy, "s": round(zb, 3), "ease": "expo.out"})
-            elif is_last_in_group and len(g["messages"]) > 2:
-                gh = (y + h) - g_start_y
-                zw = round(min(1.0, (H * 0.82) / gh, s_close), 3)
-                cams.append({"t": round(t - 0.4, 3), "d": 0.55, "x": W / 2, "y": g_start_y + gh / 2, "s": zw, "ease": "power3.inOut"})
-            elif k == 0:
-                cams.append({"t": 0, "d": 0, "x": W / 2, "y": cy, "s": round(s_close, 3), "ease": "none"})
-            else:
-                lead = 0.6 if side == "in" else 0.25
-                cams.append({"t": round(max(0.0, t - lead), 3), "d": 0.45, "x": W / 2, "y": cy, "s": round(s_close, 3), "ease": "power3.inOut"})
-            y += h + gap
-            k += 1
-        if gi < len(groups) - 1:
-            swipes.append({"g": gi, "t": round(t + float(s.get("hold", 0.45)), 3)})
-            y_top = y + 700 * u
-    # sort and make sure camera moves do not overlap (each ends before the next starts)
-    cams.sort(key=lambda c: c["t"])
-    for a, b in zip(cams, cams[1:]):
-        if a["t"] + a["d"] > b["t"]:
-            a["d"] = round(max(0.12, b["t"] - a["t"]), 3)
-    # swipe camera moves are just the next group's first camera; make them faster and smoother
-    for sw in swipes:
-        nxt = next((c for c in cams if c["t"] >= sw["t"]), None)
-        if nxt:
-            nxt["ease"] = "power4.inOut"
-    end = msgs[-1]
-    zt = None
-    if s.get("zoom_through", end["big"]):
-        zx = (W - end["edge"] - end["w"] / 2) if end["side"] == "out" else (end["edge"] + end["w"] / 2)
-        zt = {"x": round(zx, 1), "y": round(end["y"] + end["h"] / 2, 1), "s": 10}
-    last_t = max(m["t"] for m in msgs)
-    if last_t + 0.6 > float(s["duration"]):
-        raise PipelineError(f"scene '{sid}': last chat message at {last_t:.2f}s does not fit in {s['duration']}s "
-                            f"(lower 'step' or raise 'duration')")
-    return {"msgs": msgs, "labels": labels, "cams": cams, "swipes": swipes, "glows": glows,
-            "col": {"left": left, "width": colW}, "zoom_through": zt, "first_visible": first_visible,
-            "height": y + 400 * u, "n": n_total}
-
-
 def speech_words(p, for_captions: bool = False) -> list[dict]:
     """Spoken words in film time: auto-edit plan > transcript (A-roll at film time = source time) > voice words."""
     if p.auto:
@@ -161,12 +57,14 @@ def speech_words(p, for_captions: bool = False) -> list[dict]:
     return []
 
 
-def caption_phrases(words: list[dict], max_words: int) -> list[dict]:
+def caption_phrases(words: list[dict], max_words: int, max_chars: int | None = None) -> list[dict]:
     out, cur = [], []
     for w in words:
         cur.append(w)
         end_punct = w["text"].rstrip().endswith((".", "!", "?", ",", "।"))
-        if len(cur) >= max_words or end_punct:
+        nxt_i = words.index(w) + 1
+        too_long = max_chars and nxt_i < len(words) and len(" ".join(x["text"] for x in cur)) + 1 + len(words[nxt_i]["text"]) > max_chars
+        if len(cur) >= max_words or end_punct or too_long:
             out.append(cur)
             cur = []
     if cur:
@@ -209,7 +107,7 @@ def run_stage(p) -> dict:
         if not f:
             raise PipelineError(f"aroll.video '{ar}' is not in project.footage")
         dst = hf / "assets" / "footage" / f"{ar}_dialog.wav"
-        run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", f["path"], "-vn", "-ac", "2", "-ar", "48000", str(dst)])
+        run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", f["path"], "-vn", "-af", (p.cfg.get("dialog") or {}).get("chain", "anull"), "-ac", "2", "-ar", "48000", str(dst)])
     bed = p.build / "music" / "bed.wav"
     if p.cfg["music"]["mode"] != "none":
         if not bed.exists():
@@ -266,24 +164,26 @@ def run_stage(p) -> dict:
                 s = {**s, "audio": s["video"] != ar}   # mute only when this clip is the aroll dialogue source
         s = esc(s)
         ctx = {"s": s, "W": W, "H": H, "u": u, "id": sid, "T": T, "G": G}
-        if s["type"] == "chat":
-            ctx["L"] = chat_layout(s, W, H, sid)
         html = env.get_template(f"{s['type']}.html.j2").render(**ctx)
         dst.write_text(html, encoding="utf-8", newline="\n")
         log.info("  %-8s %-8s %5.2fs @ %6.2fs", sid, s["type"], s["duration"], s["start"])
 
     captions = False
     prog = p.duration if (p.auto and p.cfg["autoedit"].get("progress_bar")) else 0
-    if p.cfg["captions"]["enabled"] or prog:
+    overlays = esc(p.plan().get("overlays") or []) if p.auto else []
+    if p.cfg["captions"]["enabled"] or prog or overlays:
         words = speech_words(p, for_captions=True) if p.cfg["captions"]["enabled"] else []
         if p.cfg["captions"]["enabled"] and not words:
             raise PipelineError("captions.enabled needs words: transcribe.enabled with aroll, or a voice with word timings")
         # no captions over full-screen graphics (they carry their own text)
-        busy = [(x["start"], x["start"] + x["duration"]) for x in scenes if x["type"] in ("list", "kinetic", "card", "endcard", "chat")]
+        busy = [(x["start"], x["start"] + x["duration"]) for x in scenes if x["type"] in ("list", "kinetic")]
         words = [w for w in words if not any(a - 0.05 <= w["start"] < b for a, b in busy)]
+        hook = next((o for o in overlays if o["type"] == "hook"), None)
+        if hook and not p.cfg["autoedit"].get("hook_text"):      # the auto hook IS the first sentence: don't say it twice
+            words = [w for w in words if w["start"] >= hook["end"] - 0.1]
         cst = p.cfg["captions"].get("style")
-        mw = 1 if cst == "slam" else min(3, int(p.cfg["captions"]["max_words"])) if cst in ("reel", "pill", "highlight", "color") else int(p.cfg["captions"]["max_words"])
-        P = caption_phrases(esc(words), mw)
+        mw = 1 if cst == "slam" else min(3, int(p.cfg["captions"]["max_words"])) if cst in ("reel", "pill", "highlight", "color", "stroke") else int(p.cfg["captions"]["max_words"])
+        P = caption_phrases(esc(words), mw, 20 if cst == "stroke" else None)
         C = dict(p.cfg["captions"])
         if p.auto:                                  # never on the speaker's face
             safe = p.plan().get("safe") or {}
@@ -293,7 +193,7 @@ def run_stage(p) -> dict:
             nxt = [b0 for b0, _ in busy if b0 > ph["start"]]
             if nxt:
                 ph["end"] = round(min(ph["end"], min(nxt) - 0.08), 3)
-        html = env.get_template("captions.html.j2").render(P=P, C=C, PROG=prog, W=W, H=H, u=u, T=T)
+        html = env.get_template("captions.html.j2").render(P=P, C=C, PROG=prog, W=W, H=H, u=u, T=T, O=overlays)
         (hf / "compositions" / "captions.html").write_text(html, encoding="utf-8", newline="\n")
         captions = True
 

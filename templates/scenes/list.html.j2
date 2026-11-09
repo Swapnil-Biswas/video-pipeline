@@ -26,7 +26,7 @@
       <p id="{{ id }}-h">{{ lib.words(s.heading or 'What you [need]', dark) }}</p>
       <div id="{{ id }}-list">
         {%- for it in s['items'] %}
-        <div class="it{{ '' if dark else ' clay clay--surface' }}" id="{{ id }}-i{{ loop.index0 }}"><span class="ic">{{ lib.glyph((s.icons or [])[loop.index0] if s.icons else icon_for(it) or 'check') }}</span><span>{{ it }}</span><span class="tick {{ 'tick--light' if dark else '' }} tk" id="{{ id }}-k{{ loop.index0 }}"></span></div>
+        <div class="it{{ '' if dark else ' panel panel--surface' }}" id="{{ id }}-i{{ loop.index0 }}"><span class="ic">{{ lib.glyph((s.icons or [])[loop.index0] if s.icons else icon_for(it) or 'check') }}</span><span>{{ it }}</span><span class="tick {{ 'tick--light' if dark else '' }} tk" id="{{ id }}-k{{ loop.index0 }}"></span></div>
         {%- endfor %}
       </div>
     </div>

@@ -13,7 +13,7 @@
   <style>
     #{{ id }}-root { position: absolute; inset: 0; overflow: hidden; background: {{ T.dark0 }}; }
     #{{ id }}-cam { position: absolute; inset: 0; transform-origin: 50% 40%; }
-    #{{ id }}-kb { position: absolute; inset: 0; transform-origin: 50% 32%; }
+    #{{ id }}-kb, #{{ id }}-hit { position: absolute; inset: 0; transform-origin: {{ ((s.focus or [0.5, 0.36])[0] * 100)|round(1) }}% {{ ((s.focus or [0.5, 0.36])[1] * 100)|round(1) }}%; }
     #{{ id }}-v { position: absolute; left: 0; top: 0; width: {{ W }}px; height: {{ H }}px; object-fit: {{ s.fit or 'cover' }}; }
     #{{ id }}-scrim { position: absolute; inset: 0; background: {{ 'linear-gradient(180deg, rgba(0,0,0,0) 45%, rgba(0,0,0,.72) 100%)' if pos == 'bottom' else ('linear-gradient(180deg, rgba(0,0,0,0) 38%, rgba(0,0,0,.55) 62%, rgba(0,0,0,.2) 85%)' if pos == 'middle' else 'rgba(0,0,0,.35)') }}; }
     #{{ id }}-cap { position: absolute; left: 0; right: 0; {{ ('bottom: ' ~ (110*u)|round ~ 'px') if pos == 'bottom' else ('top: ' ~ (H*0.56)|round ~ 'px' if pos == 'middle' else 'top: 50%; transform: translateY(-50%)') }}; display: flex; flex-direction: column; align-items: center; gap: {{ (10*u)|round }}px; }
@@ -21,7 +21,7 @@
     #{{ id }}-root .kl .w { display: inline-block; margin-right: 0.2em; }
     #{{ id }}-root .kl .w:last-child { margin-right: 0; }
     #{{ id }}-root .kl .acc { text-shadow: none; }
-    /* keyword pop-up: pill word + clay icon tile */
+    /* keyword pop-up: pill word + panel icon tile */
     #{{ id }}-root .kw { position: absolute; top: {{ (H*(o_top or 0.12))|round }}px; display: flex; align-items: center; gap: {{ (18*u)|round }}px; }
     #{{ id }}-root .kw.right { right: {{ (60*u)|round }}px; flex-direction: row-reverse; }
     #{{ id }}-root .kw.left { left: {{ (60*u)|round }}px; }
@@ -40,9 +40,9 @@
   </style>
   <div id="{{ id }}-root" data-composition-id="{{ id }}" data-width="{{ W }}" data-height="{{ H }}" data-layout-allow-overlap>
     <div id="{{ id }}-cam" data-layout-allow-overflow>
-      <div id="{{ id }}-kb" data-layout-allow-overflow>
+      <div id="{{ id }}-hit" data-layout-allow-overflow><div id="{{ id }}-kb" data-layout-allow-overflow>
         <video id="{{ id }}-v" class="clip" src="assets/footage/{{ s.video }}.mp4" data-start="0" data-duration="{{ d }}" data-media-start="{{ s.media_start or 0 }}" data-track-index="1" {% if s.audio %}data-has-audio="true"{% else %}muted{% endif %} playsinline{% if G %} data-color-grading='{{ G|tojson }}'{% endif %}></video>
-      </div>
+      </div></div>
       {%- if s.lines %}
       <div id="{{ id }}-scrim" data-layout-ignore></div>
       <div id="{{ id }}-cap">
@@ -55,11 +55,11 @@
     {%- for o in (s.overlays or []) %}
     {%- if o.type == 'keyword' %}
     <div class="kw {{ o.side or 'right' }}" id="{{ id }}-o{{ loop.index0 }}">
-      {%- if o.emoji %}<div class="emo" id="{{ id }}-o{{ loop.index0 }}t">{{ o.emoji }}</div>{% elif o.icon %}<div class="tile clay clay--dark" id="{{ id }}-o{{ loop.index0 }}t">{{ lib.glyph(o.icon) }}</div>{% endif %}
+      {%- if o.emoji %}<div class="emo" id="{{ id }}-o{{ loop.index0 }}t">{{ o.emoji }}</div>{% elif o.icon %}<div class="tile panel panel--dark" id="{{ id }}-o{{ loop.index0 }}t">{{ lib.glyph(o.icon) }}</div>{% endif %}
       <span class="pill acc" id="{{ id }}-o{{ loop.index0 }}p">{{ o.text }}</span>
     </div>
     {%- elif o.type == 'stat' %}
-    <div class="st clay clay--dark" id="{{ id }}-o{{ loop.index0 }}"><div class="n"><span id="{{ id }}-o{{ loop.index0 }}n">0</span>{{ o.suffix }}</div>{% if o.label %}<div class="l">{{ o.label }}</div>{% endif %}</div>
+    <div class="st panel panel--dark" id="{{ id }}-o{{ loop.index0 }}"><div class="n"><span id="{{ id }}-o{{ loop.index0 }}n">0</span>{{ o.suffix }}</div>{% if o.label %}<div class="l">{{ o.label }}</div>{% endif %}</div>
     {%- elif o.type == 'lowerthird' %}
     <div class="lt" id="{{ id }}-o{{ loop.index0 }}"><i></i>{{ o.text }}</div>
     {%- endif %}
@@ -71,6 +71,9 @@
       const tl = gsap.timeline({ paused: true });
 {{ lib.entry_js(s.entry or 'blur', id ~ '-cam', id ~ '-flash') }}
       tl.fromTo("#{{ id }}-kb", { scale: {{ push[0] }} }, { scale: {{ push[1] }}, duration: {{ d }}, ease: "none" }, 0);
+      {%- for h in (s.hits or []) %}
+      tl.fromTo("#{{ id }}-hit", { scale: 1 }, { scale: {{ 1 + h.by }}, duration: 0.16, ease: "power3.out" }, {{ h.at }});
+      {%- endfor %}
       {%- for l in (s.lines or []) %}
       {%- if has_plain(l.text) %}
       tl.fromTo("#{{ id }}-l{{ loop.index0 }} .w:not(.acc)", { opacity: 0, y: {{ (30*u)|round }}, filter: "blur(12px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.2, stagger: 0.06, ease: "power3.out" }, {{ 0.15 + loop.index0 * 0.22 }});

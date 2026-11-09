@@ -1,6 +1,6 @@
 """Stage 6 · sfx: write the <!-- AUDIO --> block: music (with ducking automation), voice, and every SFX cue.
 
-Ported from video-showreel/tools/audio.py: each cue starts at picture_time + frame_offset/fps - PEAK[file]
+Each cue starts at picture_time + frame_offset/fps - PEAK[file]
 so the sound's peak lands one frame after the picture event; cues are packed greedily into lanes."""
 from __future__ import annotations
 

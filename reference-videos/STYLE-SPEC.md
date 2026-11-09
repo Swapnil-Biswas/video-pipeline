@@ -28,7 +28,7 @@ kinetic type + B-roll). reelforge already distinguishes these (`autoedit.mode: t
    over the speaker (~0.66 height) or bottom. → reelforge `captions.style: reel` + `style.from_reference` (learns
    accent + casing via OCR). **Done.**
 2. **Hook title card** — opening title, often on black (`yt01` "THE DEVIN JATHO"). → `autoedit.hook`. **Done.**
-3. **Floating clay cards beside the speaker**, synced to words: tier-lists (`yt01`), app-icon tiles, photo thumbnails
+3. **Floating cards beside the speaker**, synced to words: tier-lists (`yt01`), app-icon tiles, photo thumbnails
    (`ig04`), chat/quote bubbles (`yt01`, `yt04`), stat callouts ("$197K" `yt01`, "$1.23M" `yt04`). → `kinetic` tiles,
    `card`, `chat`, and `overlay` keyword/stat/lowerthird types. **Done / partial** (photo-thumbnail tiles = to build).
 4. **Keyword & stat pops** timed to emphasis words. → `autoedit` keyword overlays. **Done.**

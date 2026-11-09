@@ -1,6 +1,6 @@
 """Themes: every colour, font and caption look the templates use, as one dict.
 
-DEFAULT_THEME is the HireCrew black & white claymorphism look (the templates render exactly as before).
+DEFAULT_THEME is a neutral social-video look: white captions, black outline, one strong accent.
 A reference video's style profile produces a different theme (stages/style.py -> derive_theme)."""
 from __future__ import annotations
 
@@ -12,17 +12,17 @@ BUNDLED_FONTS = ["Inter", "Montserrat", "Outfit", "Nunito", "Oswald", "League Go
                  "Open Sans", "Lato", "Poppins"]
 
 DEFAULT_THEME = {
-    "name": "hirecrew-bw",
+    "name": "reel-default",
     "dark0": "#0a0a0b", "dark1": "#111113", "dark2": "#1d1d20",
     "light0": "#fafafa", "light1": "#ececee", "light2": "#e1e1e3",
     "on_dark": "#f2f2f3", "on_dark_2": "#9a9a9e", "on_light": "#151515", "on_light_2": "#6a6a6e",
     "card_dark": "#232326", "card_dark_2": "#1a1a1c", "card_dark_3": "#3a3a3e", "light_row": "#efeff0", "paper": "#f4f4f4",
-    "accent": "#1c1c1e", "on_accent": "#f6f6f6",              # pill on light worlds
-    "accent_light": "#f7f7f7", "on_accent_light": "#151515",  # pill on dark worlds / footage
-    "cap_fg": "#ffffff", "cap_hl_bg": "#f6f6f6", "cap_hl_fg": "#151515", "cap_box": "rgba(10,10,11,.42)",
+    "accent": "#ffd60a", "on_accent": "#111111",              # pill on light worlds
+    "accent_light": "#ffd60a", "on_accent_light": "#111111",  # pill on dark worlds / footage
+    "cap_fg": "#ffffff", "cap_hl_bg": "#ffd60a", "cap_hl_fg": "#111111", "cap_box": "rgba(10,10,11,.42)",
     "cap_shadow": "0 0 2px rgba(0,0,0,.9), 0 3px 0 rgba(0,0,0,.55), 0 8px 26px rgba(0,0,0,.55)",
-    "font_body": '"Instrument Sans", sans-serif', "font_display": '"Instrument Sans", sans-serif',
-    "display_weight": 700, "display_tracking": "-0.04em", "display_upper": False,
+    "font_body": '"Inter", sans-serif', "font_display": '"Montserrat", sans-serif',
+    "display_weight": 800, "display_tracking": "-0.04em", "display_upper": False,
     "radius": 1.0,                                            # corner roundness multiplier
 }
 
@@ -66,7 +66,7 @@ def readable_on(bg: str, light="#ffffff", dark="#151515") -> str:
 
 
 def theme_css(T: dict) -> str:
-    """CSS that re-skins the shared brand classes (worlds, pills, clay, chips, states, buttons, ticks)."""
+    """CSS that re-skins the shared brand classes (worlds, pills, panel, chips, states, buttons, ticks)."""
     up = "text-transform: uppercase;" if T.get("display_upper") else ""
     r = float(T.get("radius", 1.0))
     return f"""
@@ -76,8 +76,8 @@ def theme_css(T: dict) -> str:
       .world-light {{ background: radial-gradient(ellipse 75% 70% at 50% 42%, {T['light0']} 0%, {T['light1']} 65%, {T['light2']} 100%); }}
       .acc {{ background: {T['accent']}; color: {T['on_accent']}; border-radius: {999 if r >= 0.5 else int(18 * r)}px; }}
       .acc--light {{ background: {T['accent_light']}; color: {T['on_accent_light']}; }}
-      .clay--dark {{ background: {T['card_dark']}; color: {T['on_dark']}; }}
-      .clay--surface {{ background: {T['paper']}; }}
+      .panel--dark {{ background: {T['card_dark']}; color: {T['on_dark']}; }}
+      .panel--surface {{ background: {T['paper']}; }}
       .state--released, .state--dark {{ background: {T['accent']}; color: {T['on_accent']}; }}
       .btn--dark {{ background: {T['accent']}; color: {T['on_accent']}; }}
       .tick {{ background: {T['accent']}; }}

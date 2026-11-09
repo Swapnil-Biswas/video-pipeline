@@ -10,7 +10,7 @@ import yaml
 from .util import PipelineError
 
 ROOT = Path(__file__).resolve().parent.parent          # video-pipeline/
-SCENE_TYPES = {"file", "kinetic", "card", "chat", "endcard", "footage", "list"}
+SCENE_TYPES = {"file", "kinetic", "footage", "list"}
 RES_PRESETS = {  # HyperFrames --resolution presets -> (w, h)
     "landscape": (1920, 1080), "portrait": (1080, 1920), "landscape-4k": (3840, 2160),
     "portrait-4k": (2160, 3840), "square": (1080, 1080), "square-4k": (2160, 2160),
@@ -156,7 +156,7 @@ def style_overrides(p: "Project") -> dict:
     s = json.loads(f.read_text(encoding="utf-8"))
     e, c, m = s.get("edit", {}), s.get("captions", {}), s.get("music", {})
     out = {"theme": s.get("theme", {}),
-           "autoedit": {k: e[k] for k in ("min_shot", "max_shot", "punch", "punch_every", "keyword_spacing", "transition_weights") if k in e},
+           "autoedit": {k: e[k] for k in ("min_shot", "max_shot", "punch", "punch_hi", "punch_every", "keyword_spacing", "transition_weights") if k in e},
            "captions": {k: c[k] for k in ("style", "reel_y", "upper", "box", "max_words", "reel_size") if k in c}}
     if s.get("grade"):
         out["grade"] = s["grade"]

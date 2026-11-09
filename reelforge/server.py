@@ -1,4 +1,4 @@
-"""HTTP API for HireCrew: upload footage + a reference video, get the footage edited in the reference's style.
+"""HTTP API: upload footage + a reference video, get the footage edited in the reference's style.
 
     python -m reelforge serve --host 0.0.0.0 --port 8088
 

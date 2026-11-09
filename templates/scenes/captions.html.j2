@@ -11,7 +11,9 @@
 {%- set st = 'pill' if (C.style or 'pill') == 'reel' else (C.style or 'pill') -%}
 {%- set shadow = T.cap_shadow or "0 0 2px rgba(0,0,0,.9), 0 3px 0 rgba(0,0,0,.55), 0 8px 26px rgba(0,0,0,.55)" -%}
 {%- set noshadow = "0 0 0 rgba(0,0,0,0), 0 0 0 rgba(0,0,0,0), 0 0 0 rgba(0,0,0,0)" -%}
-{%- set hlbg = T.cap_hl_bg -%}
+{%- set hlbg = T.accent if st == 'stroke' else T.cap_hl_bg -%}
+{%- set cfg = '#ffffff' if st == 'stroke' else T.cap_fg -%}
+{%- set outline = (C.reel_size*u*0.17)|round(1) -%}
 {%- set box = C.box if C.box is not none and C.box is defined else true -%}
 <template>
   <style>
@@ -26,17 +28,40 @@
     #captions-root .ph .box { max-width: {{ (W*0.86)|round }}px; text-align: center; font-family: {{ T.font_display }};
       font-size: {{ ((C.reel_size * (1.9 if st == 'slam' else 1.0))*u)|round }}px; font-weight: {{ T.display_weight if T.display_weight > 600 else 700 }}; letter-spacing: -0.02em; line-height: 1.16; color: {{ T.cap_fg }};
       {% if C.upper %}text-transform: uppercase;{% endif %} text-shadow: {{ shadow }};
+      {% if st == 'stroke' %}color: #ffffff; -webkit-text-stroke: {{ outline }}px #000; paint-order: stroke fill;{% endif %}
       {% if box %}padding: 0.1em 0.3em 0.14em; border-radius: 0.4em; background: {{ T.cap_box }};{% endif %} }
     #captions-root .ph .cw { display: inline-block; padding: 0.02em 0.16em 0.06em; margin: 0 0.02em; border-radius: 0.28em; }
     {%- endif %}
+    #captions-root .ov { position: absolute; opacity: 0; font-family: {{ T.font_display }}; font-weight: 800; color: #fff; text-transform: uppercase; letter-spacing: -0.01em; -webkit-text-stroke: {{ (11*u)|round(1) }}px #000; paint-order: stroke fill; }
+    #captions-root .ov b { color: {{ T.accent }}; font-weight: 800; }
+    #captions-root .ov-hook { left: {{ (W*0.05)|round }}px; right: {{ (W*0.05)|round }}px; top: {{ (H*0.06)|round }}px; text-align: center; font-size: {{ (74*u)|round }}px; line-height: 1.12; }
+    #captions-root .ov-stat { left: 0; right: 0; top: {{ (H*0.05)|round }}px; text-align: center; }
+    #captions-root .ov-stat .n { font-size: {{ (176*u)|round }}px; line-height: 1; color: {{ T.accent }}; font-variant-numeric: tabular-nums; }
+    #captions-root .ov-stat .l { font-size: {{ (56*u)|round }}px; line-height: 1.1; }
+    #captions-root .ov-list { left: {{ (W*0.07)|round }}px; right: {{ (W*0.05)|round }}px; top: {{ (H*0.05)|round }}px; opacity: 1; font-size: {{ (64*u)|round }}px; line-height: 1.26; }
+    #captions-root .ov-list div { opacity: 0; }
+    #captions-root .ov-list i { font-style: normal; color: {{ T.accent }}; margin-right: 0.28em; }
+    #captions-root .ov-emoji { top: {{ (H*0.58)|round }}px; font-size: {{ (150*u)|round }}px; line-height: 1; -webkit-text-stroke: 0; filter: drop-shadow(0 {{ (6*u)|round }}px {{ (14*u)|round }}px rgba(0,0,0,.45)); }
     #captions-prog { position: absolute; left: 0; top: 0; height: {{ ([6*u, 4]|max)|round }}px; width: 100%; background: {{ T.cap_hl_bg }}; transform-origin: 0 50%; transform: scaleX(0); box-shadow: 0 0 10px rgba(0,0,0,.35); }
   </style>
   <div id="captions-root" data-composition-id="captions" data-width="{{ W }}" data-height="{{ H }}" data-layout-allow-overlap>
     {%- if PROG %}<div id="captions-prog" data-layout-ignore></div>{% endif %}
     {%- for p in P %}
     {%- set chars = (p.words|map(attribute='text')|join(' '))|length %}
-    {%- set fit = ((W*0.70) / ([chars, 1]|max * 0.66 * C.reel_size * 1.9 * u)) if st == 'slam' else 1 %}
-    <div class="ph" id="{{ p.id }}"><span class="box"{% if fit < 1 %} style="font-size:{{ (C.reel_size * 1.9 * u * fit)|round }}px"{% endif %}>{% for w in p.words %}<span class="cw" id="{{ p.id }}-w{{ loop.index0 }}">{{ w.text }}</span>{% if not loop.last %} {% endif %}{% endfor %}</span></div>
+    {%- set mult = 1.9 if st == 'slam' else 1 %}
+    {%- set fit = ((W*(0.70 if st == 'slam' else 0.84)) / ([chars, 1]|max * (0.74 if C.upper else 0.62) * C.reel_size * mult * u)) if st in ['slam', 'stroke'] else 1 %}
+    <div class="ph" id="{{ p.id }}"><span class="box"{% if fit < 1 %} style="font-size:{{ (C.reel_size * mult * u * fit)|round }}px"{% endif %}>{% for w in p.words %}<span class="cw" id="{{ p.id }}-w{{ loop.index0 }}">{{ w.text }}</span>{% if not loop.last %} {% endif %}{% endfor %}</span></div>
+    {%- endfor %}
+    {%- for o in (O or []) %}{% set oid = 'ov' ~ loop.index0 %}
+    {%- if o.type == 'hook' %}
+    <div class="ov ov-hook" id="{{ oid }}">{% for w, acc in split_words(o.text) %}{% if acc %}<b>{{ w }}</b>{% else %}{{ w }}{% endif %}{% if not loop.last %} {% endif %}{% endfor %}</div>
+    {%- elif o.type == 'stat' %}
+    <div class="ov ov-stat" id="{{ oid }}"><div class="n">{{ o.prefix }}<span id="{{ oid }}n">0</span>{{ o.suffix }}</div>{% if o.label %}<div class="l">{{ o.label }}</div>{% endif %}</div>
+    {%- elif o.type == 'checklist' %}
+    <div class="ov ov-list" id="{{ oid }}">{% for r in o['items'] %}<div id="{{ oid }}r{{ loop.index0 }}"><i>&#10003;</i>{{ r.text }}</div>{% endfor %}</div>
+    {%- elif o.type == 'emoji' %}
+    <div class="ov ov-emoji" id="{{ oid }}" style="{{ 'left' if o.side == 0 else 'right' }}:{{ (W*0.05)|round }}px">{{ o.emoji }}</div>
+    {%- endif %}
     {%- endfor %}
   </div>
   <script>
@@ -55,12 +80,12 @@
       tl.fromTo("#{{ p.id }}", { opacity: 0, scale: 1.5, y: {{ (30*u)|round }} }, { opacity: 1, scale: 1, y: 0, duration: {{ [0.12, (p.end - p.start) * 0.4]|min|round(3) }}, ease: "power4.out" }, {{ p.start }});
       {%- else %}
       tl.fromTo("#{{ p.id }}", { opacity: 0, scale: 0.86, y: {{ (14*u)|round }} }, { opacity: 1, scale: 1, y: 0, duration: {{ [0.14, (p.end - p.start) * 0.4]|min|round(3) }}, ease: "back.out(2)" }, {{ p.start }});
-      {%- if st in ['pill', 'highlight', 'color'] %}
+      {%- if st in ['pill', 'highlight', 'color', 'stroke'] %}
       {%- for w in p.words %}
-      {%- if st == 'color' %}
-      tl.fromTo("#{{ p.id }}-w{{ loop.index0 }}", { color: "{{ T.cap_fg }}" }, { color: "{{ hlbg }}", duration: 0.05 }, {{ w.start }});
+      {%- if st in ['color', 'stroke'] %}
+      tl.fromTo("#{{ p.id }}-w{{ loop.index0 }}", { color: "{{ cfg }}" }, { color: "{{ hlbg }}", duration: 0.05 }, {{ w.start }});
       {%- if not loop.last %}
-      tl.to("#{{ p.id }}-w{{ loop.index0 }}", { color: "{{ T.cap_fg }}", duration: 0.05 }, {{ p.words[loop.index0 + 1].start }});
+      tl.to("#{{ p.id }}-w{{ loop.index0 }}", { color: "{{ cfg }}", duration: 0.05 }, {{ p.words[loop.index0 + 1].start }});
       {%- endif %}
       {%- else %}
       tl.fromTo("#{{ p.id }}-w{{ loop.index0 }}", { backgroundColor: "{{ hlbg }}00", color: "{{ T.cap_fg }}", textShadow: "{{ shadow }}" },
@@ -73,6 +98,26 @@
       {%- endif %}
       {%- endif %}
       tl.to("#{{ p.id }}", { opacity: 0, duration: {{ [0.04, (p.end - p.start) * 0.2]|min|round(3) }} }, {{ p.end }});
+      {%- endfor %}
+      {%- for o in (O or []) %}{% set oid = 'ov' ~ loop.index0 %}
+      {%- if o.type == 'hook' %}
+      tl.fromTo("#{{ oid }}", { opacity: 0, y: {{ (-24*u)|round }}, scale: 0.92 }, { opacity: 1, y: 0, scale: 1, duration: 0.24, ease: "back.out(2)" }, {{ o.t }});
+      tl.to("#{{ oid }}", { opacity: 0, duration: 0.14 }, {{ o.end - 0.14 }});
+      {%- elif o.type == 'stat' %}
+      const c{{ loop.index0 }} = { v: 0 };
+      const f{{ loop.index0 }} = () => { document.getElementById("{{ oid }}n").textContent = Math.round(c{{ loop.index0 }}.v); };
+      tl.fromTo("#{{ oid }}", { opacity: 0, scale: 0.6 }, { opacity: 1, scale: 1, duration: 0.24, ease: "back.out(2.2)" }, {{ o.t }});
+      tl.fromTo(c{{ loop.index0 }}, { v: 0 }, { v: {{ o.value }}, duration: 0.55, ease: "power2.out", onUpdate: f{{ loop.index0 }}, onComplete: f{{ loop.index0 }}, immediateRender: true }, {{ o.t }});
+      tl.to("#{{ oid }}", { opacity: 0, duration: 0.14 }, {{ o.end - 0.14 }});{{ cue('pop', o.t + 0.05, 0.55) }}
+      {%- elif o.type == 'checklist' %}
+      {%- for r in o['items'] %}
+      tl.fromTo("#{{ oid }}r{{ loop.index0 }}", { opacity: 0, x: {{ (-40*u)|round }} }, { opacity: 1, x: 0, duration: 0.2, ease: "back.out(2)" }, {{ r.t }});{{ cue('pop-hi', r.t + 0.02, 0.45) }}
+      {%- endfor %}
+      tl.to("#{{ oid }} div", { opacity: 0, duration: 0.14 }, {{ o.end - 0.14 }});
+      {%- elif o.type == 'emoji' %}
+      tl.fromTo("#{{ oid }}", { opacity: 0, scale: 0.2, rotation: -24 }, { opacity: 1, scale: 1, rotation: 6, duration: 0.3, ease: "back.out(3)" }, {{ o.t }});
+      tl.to("#{{ oid }}", { opacity: 0, scale: 0.7, duration: 0.14 }, {{ o.end - 0.14 }});{{ cue('pop', o.t + 0.04, 0.4) }}
+      {%- endif %}
       {%- endfor %}
       window.__timelines["captions"] = tl;
     })();

@@ -7,7 +7,7 @@ When project `scenes: auto` and `aroll.video` is set, this writes build/<name>/a
   - motion-graphics representations of what is said:
       list cutaways   ("a good camera, a good mic, good lighting, a good setup" -> full-screen checklist)
       stat overlays   ("100%" -> counter card over the speaker)
-      keyword pop-ups with clay icon stickers (phone, camera, money, viral, goal ...)
+      keyword pop-ups (phone, camera, money, viral, goal ...)
   - a hook title over the first shot, an optional outro, and a lower-third name tag
   - the dialogue track as one audio range per kept span, so speech is continuous under cutaways
 Everything is plain data; compose renders it with the scene templates. Review it at the preview checkpoint."""
@@ -65,7 +65,7 @@ def emoji_for(word: str, extra: dict | None = None) -> str | None:
     if not w:
         return None
     for k, e in {**EMOJI, **(extra or {})}.items():
-        if w.startswith(k):
+        if (w == k or w == k + 's' or (len(k) >= 5 and w.startswith(k))):
             return e
     return None
 
@@ -160,15 +160,14 @@ def run_stage(p) -> dict:
     dur = float(foot["probe"]["format"]["duration"])
     ae = p.cfg["autoedit"]
     words = tr["words"]
-    # 1. keep speech, drop long pauses
-    spans = speech_spans(words, ae["min_gap"], ae["pad"], dur) if ae["trim_silence"] else [[0.0, dur]]
-    # 2. shots
+    # 1. keep speech: drop long pauses and filler sounds
+    speech = [w for w in words if not is_filler(w["text"])]
+    spans = speech_spans(speech, ae["min_gap"], ae["pad"], dur) if ae["trim_silence"] else [[0.0, dur]]
+    # 2. shots: cut where the speaker breathes, not on a timer
     shots = []
     for s0, s1 in spans:
-        shots += split_span(s0, s1, words, ae["min_shot"], ae["max_shot"])
-    # the hook title needs time to be read: merge the opening shots until the first one is long enough
-    while ae.get("hook", True) and len(shots) > 1 and shots[0][1] - shots[0][0] < ae.get("hook_min_s", 2.6)             and abs(shots[1][0] - shots[0][1]) < 1e-6:
-        shots[0:2] = [(shots[0][0], shots[1][1])]
+        shots += split_span(s0, s1, speech, ae["min_shot"], ae["max_shot"])
+    shots = merge_short(shots, ae["min_shot"] * 0.6)
     ranges, t = [], 0.0
     for s0, s1 in shots:
         ranges.append({"film": round(t, 3), "src": round(s0, 3), "dur": round(s1 - s0, 3)})
@@ -189,40 +188,11 @@ def run_stage(p) -> dict:
         ws = [w for w in film_words if w.get("phrase") == i]
         if ws:
             phrases.append({"i": i, "text": ph["text"], "start": ws[0]["start"], "end": ws[-1]["end"], "words": ws})
-
-    # 4. representations
-    cutaways = []          # (film_start, film_end, scene dict)
-    if ae["cutaways"]:
-        for ph in phrases:
-            items = find_list(ph["text"])
-            if not items:
-                continue
-            # time each item at its first word
-            times = []
-            for it in items:
-                key = clean(it.split()[-1]).lower()
-                hit = next((w for w in ph["words"] if clean(w["text"]).lower().startswith(key[:4])), None)
-                times.append(hit["start"] if hit else None)
-            t0 = min(x for x in times if x is not None) - 0.25 if any(times) else ph["start"]
-            t1 = max(x for x in times if x is not None) + 1.4 if any(times) else ph["end"]
-            cutaways.append([t0, t1, {"type": "list", "items": items, "times": times,
-                                      "heading": ae.get("list_heading") or "What you [need]"}])
-    # 5. assemble scenes: footage shots, cutaways replace the shots they cover (snapped to shot edges)
-    scenes, overlays_used, last_overlay = [], [], -99.0
-    hook_end = ranges[0]["dur"] if ranges else 0
-    cut_spans = []
-    for c0, c1, sc in cutaways:
-        i0 = max([i for i, r in enumerate(ranges) if r["film"] <= c0] or [0])
-        i1 = min([i for i, r in enumerate(ranges) if r["film"] + r["dur"] >= c1] or [len(ranges) - 1])
-        if i0 == 0:
-            i0 = 1                                      # never cut away from the hook shot
-        if i1 < i0:
-            continue
-        cut_spans.append((i0, i1, sc))
-    overlay_top = safe_zones(Path(foot["path"]), ae["punch"])["overlay_top"]
-    k, n_cut, scene_i = 0, 0, 0
-    first_sentence = re.split(r"(?<=[.!?])\s", phrases[0]["text"])[0] if phrases else ""
-    # B-roll: cut away to clips other than the talking head while the dialogue track keeps playing
+    # 4. what appears over the picture (film-wide, independent of the cuts)
+    ec = ae.get("emoji") or {}
+    overlays = plan_overlays(ae, phrases, film_words, ec.get("enabled", "auto") not in (False, "off", "false"), ec.get("extra") or {})
+    beats = sorted(o["t"] for o in overlays if o["type"] in ("emoji", "stat"))
+    # 5. picture: framing per shot, B-roll, transitions
     foot_dur = {f["id"]: float(f["probe"]["format"]["duration"]) for f in man.get("footage", [])}
     bc = ae.get("broll") or {}
     if bc.get("clips", "auto") == "auto":
@@ -235,120 +205,147 @@ def run_stage(p) -> dict:
         cpm = (((read_json(p.build / "style" / "style.json") or {}).get("measured") or {}).get("pacing") or {}).get("cuts_per_min") or 0
         bevery = 2 if cpm >= 24 else 3 if cpm >= 10 else 4
     bevery = max(2, int(bevery))
-    bmax_run = max(1, int(bc.get("max_run", 1)))
     broll_cur = {b: min(0.3, foot_dur.get(b, 0.0) * 0.05) for b in broll_ids}
-    bi, belig, brun, n_broll = 0, 0, 0, 0
-    ec = ae.get("emoji") or {}
-    emoji_on = ec.get("enabled", "auto") not in (False, "off", "false")
-    emoji_extra = ec.get("extra") or {}
-    while k < len(ranges):
-        cs = next((c for c in cut_spans if c[0] == k), None)
-        if cs:
-            i0, i1, sc = cs
-            f0 = ranges[i0]["film"]
-            f1 = ranges[i1]["film"] + ranges[i1]["dur"]
-            d = round(f1 - f0, 3)
-            times = [round(x - f0, 3) if x is not None else None for x in sc["times"]]
-            scenes.append({"id": f"cut{scene_i}", "type": "list", "duration": d, "world": graphic_world(p, n_cut),
-                           "heading": sc["heading"], "items": sc["items"], "times": times,
-                           "entry": pick_transition(ae, k, True, into_graphic=True), "exit": "zoom"})
-            k = i1 + 1
-            n_cut += 1
-            scene_i += 1
-            continue
-        r = ranges[k]
+    safe = safe_zones(Path(foot["path"]), ae["punch_hi"])
+    scenes, prev_zoom, bi, belig, n_broll = [], None, 0, 0, 0
+    for k, r in enumerate(ranges):
         f0, f1 = r["film"], r["film"] + r["dur"]
-        punch = ae["punch"]
-        push = [1.0, 1.035] if k % 2 == 0 else [punch, punch + 0.035]
-        prev_is_cut = bool(scenes) and scenes[-1]["type"] == "list"
-        ph_start = next((ph for ph in phrases if abs(ph["start"] - f0) < 0.35), None)
-        motivated = bool(ph_start and re.match(r"^(but|so|and if|now|that's why)\b", ph_start["text"], re.I))
-        entry = "none" if k == 0 else pick_transition(ae, k, motivated, after_graphic=prev_is_cut)
-        sc = {"id": f"shot{scene_i}", "type": "footage", "video": a["video"], "media_start": r["src"], "duration": r["dur"],
-              "push": push, "entry": entry, "exit": "none", "overlays": [], "overlay_top": overlay_top}
-        if k == 0 and ae.get("hook", True):
-            hook = ae.get("hook_text") or hook_from(first_sentence)
-            sc["caption_pos"] = "middle"
-            sc["lines"] = [{"text": l, "size": sz} for l, sz in hook]
-        else:
-            # overlays: stat or keyword pop-up, spaced out
-            ws = [w for w in film_words if f0 + 0.3 <= w["start"] <= f1 - 1.0]
-            stat = next((w for w in ws if re.search(r"\d+%|\$\d+|\d{2,}", w["text"])), None)
-            if stat and f0 - last_overlay > 2.5:
-                num = re.search(r"\d+", stat["text"]).group(0)
-                sc["overlays"].append({"type": "stat", "at": round(stat["start"] - f0, 3), "value": int(num),
-                                       "suffix": "%" if "%" in stat["text"] else "", "label": stat_label(stat, film_words)})
-                last_overlay = stat["start"]
-            elif ws and stat is None:
-                best = max(ws, key=lambda w: score_word(w["text"]))
-                if score_word(best["text"]) >= ae["keyword_min_score"] and best["start"] - last_overlay > ae["keyword_spacing"]:
-                    word = clean(best["text"])
-                    sc["overlays"].append({"type": "keyword", "at": round(best["start"] - f0, 3), "text": word.upper(),
-                                           "icon": icon_for(word), "emoji": emoji_for(word, emoji_extra) if emoji_on else None,
-                                           "side": "left" if len(overlays_used) % 2 else "right"})
-                    overlays_used.append(word)
-                    last_overlay = best["start"]
-        if k == 1 and a.get("name"):
-            sc["overlays"].append({"type": "lowerthird", "at": 0.2, "text": a["name"]})
-        # cover this shot with B-roll (picture only; the dialogue track keeps playing underneath)
-        if broll_on and not (k == 0 and ae.get("hook", True)):
+        shot_words = " ".join(w["text"] for w in film_words if f0 <= w["start"] < f1)
+        ph_start = next((ph for ph in phrases if abs(ph["start"] - f0) < 0.3), None)
+        motivated = bool(ph_start and re.match(r"^(but|so|and if|now|that's why|here's|the truth)\b", ph_start["text"], re.I))
+        emphatic = motivated or bool(re.search(r"[!?]", shot_words)) or any(f0 <= b < f1 for b in beats)
+        zoom = 1.0 if k == 0 else next_zoom(prev_zoom, emphatic, ae["punch"], ae["punch_hi"])
+        prev_zoom = zoom
+        hits = [{"at": round(b - f0, 3), "by": 0.08} for b in beats if f0 + 0.6 <= b <= f1 - 0.6 and r["dur"] >= 2.2][:1]
+        sc = {"id": f"shot{k}", "type": "footage", "video": a["video"], "media_start": r["src"], "duration": r["dur"],
+              "push": [zoom, round(zoom + 0.03, 3)], "focus": safe["focus"], "hits": hits, "overlays": [], "exit": "none",
+              "entry": "none" if k == 0 else pick_transition(ae, k, motivated)}
+        if broll_on and k > 0:
             belig += 1
-            take = belig % bevery == 0 and brun < bmax_run
-            bid = broll_ids[bi % len(broll_ids)] if take else None
-            if take and foot_dur.get(bid, 0.0) >= r["dur"]:
-                cdur = foot_dur[bid]
-                bi += 1
+            bid = broll_ids[bi % len(broll_ids)] if belig % bevery == 0 else None
+            if bid and foot_dur.get(bid, 0.0) >= r["dur"]:
                 ms = broll_cur.get(bid, 0.0)
-                if ms + r["dur"] > cdur - 0.1:                       # ran past the clip; restart near the top
-                    ms = min(0.3, max(0.0, cdur * 0.05))
+                if ms + r["dur"] > foot_dur[bid] - 0.1:
+                    ms = min(0.3, foot_dur[bid] * 0.05)
                 broll_cur[bid] = ms + r["dur"]
-                sc.update({"video": bid, "media_start": round(ms, 3), "audio": False, "push": [1.0, 1.04], "broll": True})
-                brun += 1
+                bi += 1
                 n_broll += 1
-            else:
-                brun = 0
+                sc.update({"video": bid, "media_start": round(ms, 3), "audio": False, "push": [1.0, 1.05], "focus": None, "hits": [], "broll": True})
         scenes.append(sc)
-        k += 1
-        scene_i += 1
     out_cfg = ae.get("outro")
     if out_cfg:
         scenes.append({"id": "outro", "type": out_cfg.get("type", "kinetic"), "duration": out_cfg.get("duration", 2.6),
                        "world": out_cfg.get("world", "dark"), "entry": out_cfg.get("entry", "whip-left"), "exit": "none",
                        **{k2: v for k2, v in out_cfg.items() if k2 not in ("type", "duration", "world", "entry")}})
-    hook_cut = ranges[0]["dur"] if ae.get("hook", True) and ranges else 0
-    cap_words = [w for w in film_words if w["start"] >= hook_cut - 0.05]
-    plan = {"safe": safe_zones(Path(foot["path"]), ae["punch"]), "scenes": scenes, "film_words": cap_words, "all_film_words": film_words, "aroll_ranges": ranges,
+    plan = {"safe": safe, "scenes": scenes, "overlays": overlays, "film_words": film_words, "all_film_words": film_words, "aroll_ranges": ranges,
             "talk_end": talk_end, "removed_s": round(removed, 3), "source_duration": dur}
     write_json(p.build / "autoedit" / "plan.json", plan)
-    n_ov = sum(len(s.get("overlays", [])) for s in scenes)
-    log.info("  %.1fs of speech kept from %.1fs (%.1fs of pauses cut), %d shots (%d B-roll), %d cutaways, %d overlays%s",
-             talk_end, dur, removed, sum(1 for s in scenes if s["type"] == "footage"), n_broll, n_cut, n_ov,
-             ", outro" if out_cfg else "")
+    log.info("  %.1fs kept from %.1fs (%.1fs of pauses cut), %d shots (%d B-roll), overlays: %s%s", talk_end, dur, removed, len(ranges), n_broll,
+             ", ".join(f"{o['type']}@{o['t']:.1f}" for o in overlays) or "none", ", outro" if out_cfg else "")
     for s in scenes:
-        extra = s.get("entry", "")
-        if s.get("broll"):
-            extra += f" BROLL:{s['video']}"
-        if s["type"] == "list":
-            extra += f" LIST {s['items']}"
-        for o in s.get("overlays", []):
-            extra += f" [{o['type']}: {o.get('text') or o.get('value')}{' +' + o['icon'] if o.get('icon') else ''}]"
-        if s.get("lines"):
-            extra += " HOOK " + " / ".join(l["text"] for l in s["lines"])
-        log.info("    %-7s %-8s %5.2fs  %s", s["id"], s["type"], s["duration"], extra)
+        log.info("    %-7s %5.2fs  zoom %s  %s%s", s["id"], s["duration"], (s.get("push") or ["-"])[0], s.get("entry", ""), " BROLL" if s.get("broll") else "")
     return {"plan": str(p.build / "autoedit" / "plan.json"), "scenes": len(scenes), "talk_end": talk_end}
 
 
-def safe_zones(video, punch: float) -> dict:
-    """Where captions and graphics may go without covering the speaker's face (punch-ins included)."""
+FILLERS = {"um", "umm", "uh", "uhh", "uhm", "erm", "hmm", "hm", "ah", "er"}
+
+
+def is_filler(text: str) -> bool:
+    return re.sub(r"[^\w]", "", text).lower() in FILLERS
+
+
+def merge_short(shots, min_len):
+    """A shot too short to register reads as a glitch: fold it into its neighbour when they are contiguous."""
+    out = []
+    for s in shots:
+        if out and (s[1] - s[0] < min_len or out[-1][1] - out[-1][0] < min_len) and abs(s[0] - out[-1][1]) < 1e-6:
+            out[-1] = (out[-1][0], s[1])
+        else:
+            out.append(tuple(s))
+    return out
+
+
+def next_zoom(prev, emphatic, med, close):
+    """Framing changes by a clearly visible step on every cut; emphasis goes tight. Never the same framing twice."""
+    if emphatic:
+        return close if prev != close else med
+    return 1.0 if prev != 1.0 else med
+
+
+def hook_text_from(sentence: str, max_words: int = 12) -> str | None:
+    clause = sentence.strip()
+    if len(clause.split()) > max_words:
+        clause = re.split(r"[,;:]", clause)[0].strip()
+    if not clause or len(clause.split()) > max_words:
+        return None
+    return " ".join(l for l, _ in hook_from(clause))
+
+
+def plan_overlays(ae, phrases, film_words, emoji_on, extra) -> list[dict]:
+    """Graphics a reel editor would actually add: a hook line, a stat when one is said, a checklist when a list is said,
+    and an occasional emoji. Sparse on purpose; they never overlap each other."""
+    O, busy = [], []
+    free = lambda a, b: all(b <= x or a >= y for x, y in busy)
+    if ae.get("hook", True) and phrases:
+        h = ae.get("hook_text")
+        if isinstance(h, list):
+            h = " ".join(x[0] if isinstance(x, (list, tuple)) else str(x) for x in h)
+        h = h or hook_text_from(re.split(r"(?<=[.!?])\s", phrases[0]["text"])[0])
+        if h:
+            end = max(float(ae.get("hook_min_s", 2.6)), min(3.6, phrases[0]["end"]))
+            O.append({"type": "hook", "t": 0.05, "end": round(end, 3), "text": h})
+            busy.append((0.0, end))
+    if ae.get("cutaways", True):
+        for ph in phrases:
+            items = find_list(ph["text"])
+            if not items:
+                continue
+            items = items[:4]
+            rows = []
+            for it in items:
+                key = clean(it.split()[-1]).lower()
+                hit = next((w for w in ph["words"] if clean(w["text"]).lower().startswith(key[:4])), None)
+                rows.append({"text": it, "t": hit["start"] if hit else None})
+            known = [x["t"] for x in rows if x["t"] is not None]
+            if len(known) < 2:
+                continue
+            a0, a1 = min(known) - 0.1, max(known) + 1.5
+            for j, x in enumerate(rows):
+                x["t"] = round(x["t"] if x["t"] is not None else a0 + 0.2 * j, 3)
+            if free(a0, a1):
+                O.append({"type": "checklist", "t": round(a0, 3), "end": round(a1, 3), "items": rows})
+                busy.append((a0, a1))
+    for i, w in enumerate(film_words):
+        if re.search(r"\d+%|\$\d", w["text"]):
+            a0, a1 = w["start"], w["start"] + 1.9
+            if free(a0 - 0.5, a1 + 0.5):
+                O.append({"type": "stat", "t": a0, "end": round(a1, 3), "value": int(re.search(r"\d+", w["text"]).group(0)),
+                          "prefix": "$" if "$" in w["text"] else "", "suffix": "%" if "%" in w["text"] else "", "label": stat_label(w, film_words)})
+                busy.append((a0, a1))
+    if emoji_on:
+        last, side = -99.0, 0
+        for w in film_words:
+            if clean(w["text"]).lower() in STOP:
+                continue
+            e = emoji_for(clean(w["text"]), extra)
+            a0, a1 = w["start"], w["start"] + 1.25
+            if e and a0 - last >= float(ae["keyword_spacing"]) and free(a0 - 0.2, a1 + 0.2):
+                O.append({"type": "emoji", "t": a0, "end": round(a1, 3), "emoji": e, "side": side % 2})
+                busy.append((a0, a1))
+                last, side = a0, side + 1
+    return sorted(O, key=lambda o: o["t"])
+
+
+def safe_zones(video, close: float) -> dict:
+    """Zoom centre (the speaker's face) and where text may go at the tightest framing."""
     from ..vision import face_box
     fb = face_box(video)
     if not fb:
-        return {"face": None, "caption_y_min": 0.0, "overlay_top": 0.12}
-    oy = 0.32                                            # footage push/punch origin (footage template: 50% 32%)
-    bottom = oy + (fb["bottom"] - oy) * (punch + 0.04)
-    top = oy - (oy - fb["top"]) * (punch + 0.04)
-    return {"face": fb, "caption_y_min": round(min(0.86, bottom + 0.03), 3),
-            "overlay_top": round(max(0.05, min(0.12, top - 0.11)), 3)}
+        return {"face": None, "focus": [0.5, 0.38], "caption_y_min": 0.0, "overlay_top": 0.08}
+    fx, fy = fb["cx"], (fb["top"] + fb["bottom"]) / 2
+    z = close + 0.03
+    return {"face": fb, "focus": [round(fx, 3), round(fy, 3)], "caption_y_min": round(min(0.84, fy + (fb["bottom"] - fy) * z + 0.02), 3),
+            "overlay_top": 0.06}
 
 
 def graphic_world(p, n: int) -> str:
@@ -365,20 +362,15 @@ def graphic_world(p, n: int) -> str:
 
 
 def pick_transition(ae: dict, k: int, motivated: bool, after_graphic: bool = False, into_graphic: bool = False) -> str:
-    """Transitions drawn from the reference's measured mix (style stage) or the house defaults.
-    Deterministic: the same plan always gets the same transitions."""
-    w = {"cut": 0.55, "flash": 0.15, "zoom-blur": 0.15, "punch": 0.2, **(ae.get("transition_weights") or {})}
+    """Hard cuts by default, as in real reels. Effects only when the reference clearly uses them or a sentence turns."""
+    w = {"cut": 0.8, "flash": 0.0, "zoom-blur": 0.05, "punch": 0.15, **(ae.get("transition_weights") or {})}
     if into_graphic or after_graphic:
-        return "zoom-blur" if w["zoom-blur"] >= 0.04 else "flash" if w["flash"] >= 0.04 else "whip-left"
-    if motivated:
-        if w["flash"] >= 0.06:
-            return "flash"
-        return "zoom-blur" if w["zoom-blur"] >= 0.06 else "punch"
-    if w["flash"] > 0.3 and k % 2 == 1:
-        return "flash"
-    if w["zoom-blur"] > 0.3 and k % 3 == 1:
         return "zoom-blur"
-    if k % int(ae.get("punch_every", 3)) == 0 and w["punch"] >= 0.05:
+    if motivated:
+        if w["flash"] >= 0.25:
+            return "flash"
+        return "punch"
+    if k % int(ae.get("punch_every", 5)) == 0 and w["punch"] >= 0.05:
         return "punch"
     return "cut"
 

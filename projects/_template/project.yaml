@@ -11,45 +11,18 @@ references: []
 footage: []
 #  - {id: clip1, src: assets/footage/raw.mp4, trim: [2.0, 6.5]}
 
-# Scene types: chat | kinetic | card | endcard | footage | file (your own HyperFrames composition)
-# Text in [brackets] becomes the accent pill.  entry: flash|whip-left|whip-right|push-up|blur|none
-# exit: whip-left|whip-right|up|blur|zoom|flash|none
-scenes:
-  - id: hook
-    type: chat
-    duration: 4.0
-    groups:
-      - who: AI agent
-        avatar: AI
-        messages:
-          - {side: out, text: "Can you do the thing?"}
-          - {side: in, text: "Done!"}
-          - {side: out, text: "IT ACTUALLY WORKED", big: true}
-  - id: title
-    type: kinetic
-    world: light
-    duration: 1.6
-    entry: flash
-    exit: blur
-    tiles: [mail, grid, doc, chat]
-    lines:
-      - {text: "Your product.", size: 68, tone: muted}
-      - {text: "One [big promise.]", size: 150}
-  - id: end
-    type: endcard
-    duration: 4.0
-    type_text: "This is"
-    # logo: assets/brand/your-logo.png    # optional: drop in your own brand logo
-    tagline: "Your [tagline.]"
-    cta: "Get started →"
+# Talking-head footage: list it above, set aroll.video to its id and keep scenes: auto.
+aroll: {video: null}
+transcribe: {enabled: true}
+scenes: auto
+captions: {enabled: true}
 
 music:
   mode: generate            # none | file | take | generate (MusicGen on the GPU)
   generate: {prompts_key: showreel, seeds: [101, 202, 303]}
-  arrange: {bpm: 124, drop: 4.0}
+  arrange: {bpm: null, drop: 0, intro_lowpass: false}
 
 voice: {mode: none}
-captions: {enabled: false}
 
 # Persistent @handle / logo watermark over every frame (optional).
 # brand:
